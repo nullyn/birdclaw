@@ -5,7 +5,7 @@ import path from "node:path";
 import NativeSqliteDatabase from "./sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { resetBirdclawPathsForTests } from "./config";
-import { getNativeDb, resetDatabaseForTests } from "./db";
+import { getDb, getNativeDb, resetDatabaseForTests } from "./db";
 
 const tempDirs: string[] = [];
 
@@ -239,6 +239,82 @@ describe("database init", () => {
 			simple: true,
 		}) as number;
 		expect(busyTimeout).toBe(5000);
+	});
+
+	it("creates the tweet_metadata table with additive idempotent bootstrap", () => {
+		const tempDir = mkdtempSync(path.join(os.tmpdir(), "birdclaw-db-"));
+		tempDirs.push(tempDir);
+		process.env.BIRDCLAW_HOME = tempDir;
+
+		const firstDb = getNativeDb({ seedDemoData: false });
+		const columns = firstDb
+			.prepare("pragma table_info(tweet_metadata)")
+			.all() as Array<{
+			name: string;
+			type: string;
+			notnull: number;
+			dflt_value: string | null;
+			pk: number;
+		}>;
+
+		expect(columns).toEqual([
+			expect.objectContaining({
+				name: "tweet_id",
+				type: "TEXT",
+				notnull: 0,
+				dflt_value: null,
+				pk: 1,
+			}),
+			expect.objectContaining({
+				name: "keywords_json",
+				type: "TEXT",
+				notnull: 1,
+				dflt_value: "'[]'",
+				pk: 0,
+			}),
+			expect.objectContaining({
+				name: "summary",
+				type: "TEXT",
+				notnull: 0,
+				dflt_value: null,
+				pk: 0,
+			}),
+			expect.objectContaining({
+				name: "image_labels_json",
+				type: "TEXT",
+				notnull: 1,
+				dflt_value: "'[]'",
+				pk: 0,
+			}),
+			expect.objectContaining({
+				name: "urls_json",
+				type: "TEXT",
+				notnull: 1,
+				dflt_value: "'[]'",
+				pk: 0,
+			}),
+			expect.objectContaining({
+				name: "model",
+				type: "TEXT",
+				notnull: 0,
+				dflt_value: null,
+				pk: 0,
+			}),
+			expect.objectContaining({
+				name: "generated_at",
+				type: "TEXT",
+				notnull: 0,
+				dflt_value: null,
+				pk: 0,
+			}),
+		]);
+
+		resetDatabaseForTests();
+		expect(() => getNativeDb({ seedDemoData: false })).not.toThrow();
+
+		void getDb()
+			.selectFrom("tweet_metadata")
+			.select(["tweet_id", "keywords_json", "generated_at"]);
 	});
 });
 

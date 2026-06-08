@@ -8,11 +8,16 @@ import { getNativeDb } from "./db";
 import { runEffectPromise, tryPromise } from "./effect-runtime";
 import { buildMediaJsonFromIncludes, countTweetMedia } from "./media-includes";
 import { readSyncCache, writeSyncCache } from "./sync-cache";
+import { lookupTweetsByIdsEffect, type TweetLookupMode } from "./tweet-lookup";
+
+export type { TweetLookupMode };
 import type {
 	XurlMentionData,
 	XurlMentionsResponse,
 	XurlMediaItem,
 	XurlMentionUser,
+	XurlReferencedTweet,
+	XurlTweetData,
 } from "./types";
 import { ensureStubProfileForXUser, upsertProfileFromXUser } from "./x-profile";
 import {
@@ -125,7 +130,10 @@ function replaceTweetFts(db: Database, tweetId: string, text: string) {
 	);
 }
 
-function getReferencedTweetId(tweet: XurlMentionData, type: string) {
+function getReferencedTweetId(
+	tweet: { referenced_tweets?: XurlReferencedTweet[] },
+	type: string,
+) {
 	return (
 		tweet.referenced_tweets?.find((item) => item.type === type)?.id ?? null
 	);
@@ -138,6 +146,8 @@ function mergePayloads(pages: XurlMentionsResponse[]): XurlMentionsResponse {
 	const seenUserIds = new Set<string>();
 	const media: XurlMediaItem[] = [];
 	const seenMediaKeys = new Set<string>();
+	const referencedTweets: XurlTweetData[] = [];
+	const seenReferencedTweetIds = new Set<string>();
 
 	for (const page of pages) {
 		for (const tweet of page.data) {
@@ -163,16 +173,27 @@ function mergePayloads(pages: XurlMentionsResponse[]): XurlMentionsResponse {
 			seenMediaKeys.add(item.media_key);
 			media.push(item);
 		}
+
+		for (const tweet of page.includes?.tweets ?? []) {
+			if (seenReferencedTweetIds.has(tweet.id)) {
+				continue;
+			}
+			seenReferencedTweetIds.add(tweet.id);
+			referencedTweets.push(tweet);
+		}
 	}
 
 	const lastPage = pages.at(-1);
+	const hasIncludes =
+		users.length > 0 || media.length > 0 || referencedTweets.length > 0;
 	const includes = {
 		...(users.length > 0 ? { users } : {}),
 		...(media.length > 0 ? { media } : {}),
+		...(referencedTweets.length > 0 ? { tweets: referencedTweets } : {}),
 	};
 	return {
 		data: tweets,
-		includes: users.length > 0 || media.length > 0 ? includes : undefined,
+		includes: hasIncludes ? includes : undefined,
 		meta: {
 			result_count: tweets.length,
 			page_count: pages.length,
@@ -229,6 +250,67 @@ function readSaturatedAtPage(payload: XurlMentionsResponse) {
 	return typeof value === "number" ? value : undefined;
 }
 
+// Shared writer for indexed parent posts so the live sync and the backfill job persist
+// reference tweets identically (kind `reference`, FTS row, never clobbering an existing
+// row's collection state). See AGENTS.md §3.
+function createReferenceParentWriter(db: Database) {
+	const upsertReferenceTweet = db.prepare(
+		`
+    insert into tweets (
+      id, account_id, author_profile_id, kind, text, created_at,
+      is_replied, reply_to_id, like_count, media_count, bookmarked, liked,
+      entities_json, media_json, quoted_tweet_id
+    ) values (?, ?, ?, 'reference', ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?)
+    on conflict(id) do update set
+      author_profile_id = excluded.author_profile_id,
+      text = excluded.text,
+      created_at = excluded.created_at,
+      like_count = excluded.like_count,
+      media_count = max(tweets.media_count, excluded.media_count),
+      entities_json = excluded.entities_json,
+      media_json = case
+        when excluded.media_json not in ('', '[]', 'null') then excluded.media_json
+        else tweets.media_json
+      end,
+      is_replied = max(tweets.is_replied, excluded.is_replied),
+      reply_to_id = coalesce(excluded.reply_to_id, tweets.reply_to_id),
+      quoted_tweet_id = coalesce(excluded.quoted_tweet_id, tweets.quoted_tweet_id),
+      kind = tweets.kind,
+      bookmarked = tweets.bookmarked,
+      liked = tweets.liked
+    `,
+	);
+	return (
+		accountId: string,
+		parent: XurlTweetData,
+		usersById: Map<string, XurlMentionUser>,
+		mediaItems?: XurlMediaItem[],
+	) => {
+		const parentAuthorId = parent.author_id;
+		const author = parentAuthorId ? usersById.get(parentAuthorId) : undefined;
+		const profile = author
+			? upsertProfileFromXUser(db, author)
+			: ensureStubProfileForXUser(db, parentAuthorId ?? `unknown_${parent.id}`);
+		const parentReplyToId = getReferencedTweetId(parent, "replied_to");
+		const parentQuotedId = getReferencedTweetId(parent, "quoted");
+		upsertReferenceTweet.run(
+			parent.id,
+			accountId,
+			profile.profile.id,
+			parent.text,
+			parent.created_at,
+			parentReplyToId ? 1 : 0,
+			parentReplyToId,
+			Number(parent.public_metrics?.like_count ?? 0),
+			countTweetMedia(parent),
+			JSON.stringify(parent.entities ?? {}),
+			buildMediaJsonFromIncludes(parent, mediaItems),
+			parentQuotedId,
+		);
+		replaceTweetFts(db, parent.id, parent.text);
+	};
+}
+
 function mergeTimelineCollectionIntoLocalStore(
 	db: Database,
 	accountId: string,
@@ -281,6 +363,27 @@ function mergeTimelineCollectionIntoLocalStore(
       raw_json = excluded.raw_json,
       updated_at = excluded.updated_at
   `);
+	const writeReferenceParent = createReferenceParentWriter(db);
+	const includedTweetsById = new Map(
+		(payload.includes?.tweets ?? []).map((tweet) => [tweet.id, tweet]),
+	);
+
+	// Persist the bookmark's single immediate quoted/retweeted parent (AGENTS.md §2).
+	// Mid-thread replies are intentionally not parent-indexed, and we never walk the
+	// parent's own references (no full-thread walk).
+	function persistReferenceParent(tweet: XurlMentionData) {
+		const parentId =
+			getReferencedTweetId(tweet, "retweeted") ??
+			getReferencedTweetId(tweet, "quoted");
+		if (!parentId || parentId === tweet.id) {
+			return;
+		}
+		const parent = includedTweetsById.get(parentId);
+		if (!parent) {
+			return;
+		}
+		writeReferenceParent(accountId, parent, usersById, payload.includes?.media);
+	}
 
 	db.transaction(() => {
 		const updatedAt = new Date().toISOString();
@@ -323,6 +426,9 @@ function mergeTimelineCollectionIntoLocalStore(
 				updatedAt,
 			);
 			replaceTweetFts(db, tweet.id, tweet.text);
+			if (kind === "bookmarks") {
+				persistReferenceParent(tweet);
+			}
 		}
 	})();
 }
@@ -577,4 +683,141 @@ export function syncTimelineCollectionEffect({
 
 export function syncTimelineCollection(options: SyncTimelineCollectionOptions) {
 	return runEffectPromise(syncTimelineCollectionEffect(options));
+}
+
+const TWEET_LOOKUP_BATCH_SIZE = 100;
+
+export interface BackfillBookmarkParentsOptions {
+	mode?: TweetLookupMode;
+	batchSize?: number;
+	db?: Database;
+}
+
+export interface BackfillBookmarkParentsResult {
+	scannedBookmarks: number;
+	missingParents: number;
+	fetched: number;
+	persisted: number;
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+	const chunks: T[][] = [];
+	for (let index = 0; index < items.length; index += size) {
+		chunks.push(items.slice(index, index + size));
+	}
+	return chunks;
+}
+
+// Backfill indexed parents for bookmarks that were synced before parent indexing existed.
+// The bookmarks API can no longer page back over the full history (pagination bug, see
+// xurl.ts), so we resolve the missing parents by id from the referenced ids already stored
+// on each bookmark and persist them via the same writer the live sync uses. Idempotent:
+// reruns skip parents whose rows now exist.
+export function backfillBookmarkReferenceParentsEffect({
+	mode = "auto",
+	batchSize = TWEET_LOOKUP_BATCH_SIZE,
+	db,
+}: BackfillBookmarkParentsOptions = {}): Effect.Effect<
+	BackfillBookmarkParentsResult,
+	unknown
+> {
+	return Effect.gen(function* () {
+		const database = db ?? (yield* trySync(() => getNativeDb()));
+		const effectiveBatchSize = Math.max(
+			1,
+			Math.min(TWEET_LOOKUP_BATCH_SIZE, Math.floor(batchSize)),
+		);
+		const rows = yield* trySync(
+			() =>
+				database
+					.prepare(
+						`
+            select c.tweet_id, c.account_id, c.raw_json, t.quoted_tweet_id
+            from tweet_collections c
+            join tweets t on t.id = c.tweet_id
+            where c.kind = 'bookmarks'
+            `,
+					)
+					.all() as Array<{
+					tweet_id: string;
+					account_id: string;
+					raw_json: string;
+					quoted_tweet_id: string | null;
+				}>,
+		);
+
+		// The "top" parent to index = the bookmark's immediate retweeted target, else its
+		// quoted target (matching the live sync priority). Retweet ids live only in the
+		// stored raw_json; quote ids are also mirrored on the quoted_tweet_id column.
+		const parentAccountById = new Map<string, string>();
+		for (const row of rows) {
+			let referencedRetweetId: string | null = null;
+			let referencedQuoteId: string | null = null;
+			try {
+				const raw = JSON.parse(row.raw_json) as {
+					referenced_tweets?: XurlReferencedTweet[];
+				};
+				referencedRetweetId = getReferencedTweetId(raw, "retweeted");
+				referencedQuoteId = getReferencedTweetId(raw, "quoted");
+			} catch {
+				// Malformed raw_json: fall back to the quoted_tweet_id column below.
+			}
+			const parentId =
+				referencedRetweetId ?? referencedQuoteId ?? row.quoted_tweet_id;
+			if (!parentId || parentId === row.tweet_id) {
+				continue;
+			}
+			if (!parentAccountById.has(parentId)) {
+				parentAccountById.set(parentId, row.account_id);
+			}
+		}
+
+		const candidateIds = [...parentAccountById.keys()];
+		const missingIds = yield* trySync(() =>
+			candidateIds.filter(
+				(id) => !database.prepare("select 1 from tweets where id = ?").get(id),
+			),
+		);
+
+		const writeReferenceParent = createReferenceParentWriter(database);
+		let fetched = 0;
+		let persisted = 0;
+		for (const ids of chunk(missingIds, effectiveBatchSize)) {
+			const response = yield* lookupTweetsByIdsEffect(ids, mode);
+			fetched += response.data.length;
+			const usersById = new Map(
+				(response.includes?.users ?? []).map((user) => [user.id, user]),
+			);
+			yield* trySync(() =>
+				database.transaction(() => {
+					for (const parent of response.data) {
+						const accountId = parentAccountById.get(parent.id);
+						if (!accountId) {
+							continue;
+						}
+						writeReferenceParent(
+							accountId,
+							parent,
+							usersById,
+							response.includes?.media,
+						);
+						persisted += 1;
+					}
+				})(),
+			);
+		}
+
+		return {
+			scannedBookmarks: rows.length,
+			missingParents: missingIds.length,
+			fetched,
+			persisted,
+		};
+	});
+}
+
+export function backfillBookmarkReferenceParents(
+	options: BackfillBookmarkParentsOptions = {},
+): Promise<BackfillBookmarkParentsResult> {
+	return runEffectPromise(backfillBookmarkReferenceParentsEffect(options));
 }

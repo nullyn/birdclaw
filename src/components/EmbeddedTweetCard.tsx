@@ -20,6 +20,9 @@ export function EmbeddedTweetCard({
 	item: EmbeddedTweet;
 	label: string;
 }) {
+	const displayText = item.textEn ?? item.text;
+	const displayEntities = item.textEn ? {} : item.entities;
+
 	return (
 		<section className={embeddedCardBodyClass}>
 			<p className={embeddedCardLabelClass}>{label}</p>
@@ -41,8 +44,8 @@ export function EmbeddedTweetCard({
 			</header>
 			<TweetRichText
 				className={embeddedCardCopyClass}
-				entities={item.entities}
-				text={item.text}
+				entities={displayEntities}
+				text={displayText}
 			/>
 			<TweetMediaGrid items={item.media} />
 		</section>

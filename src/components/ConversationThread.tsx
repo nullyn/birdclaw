@@ -67,6 +67,8 @@ export function ConversationThread({
 			<div className="flex flex-col">
 				{items.map((tweet, index) => {
 					const isAnchor = tweet.id === anchorId;
+					const displayText = tweet.textEn ?? tweet.text;
+					const displayEntities = tweet.textEn ? {} : tweet.entities;
 					return (
 						<div
 							className={cx(
@@ -112,8 +114,8 @@ export function ConversationThread({
 								</header>
 								<TweetRichText
 									className="mt-1 whitespace-pre-wrap break-words text-[14px] leading-[1.45] text-[var(--ink)] [overflow-wrap:anywhere]"
-									entities={tweet.entities}
-									text={tweet.text}
+									entities={displayEntities}
+									text={displayText}
 								/>
 								<TweetMediaGrid items={tweet.media} />
 							</div>

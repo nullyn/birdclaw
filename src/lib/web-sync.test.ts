@@ -6,11 +6,7 @@ import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const maybeAutoSyncBackupMock = vi.fn();
-const syncDirectMessagesViaCachedBirdMock = vi.fn();
-const syncMentionThreadsMock = vi.fn();
-const syncMentionsMock = vi.fn();
 const syncTimelineCollectionMock = vi.fn();
-const syncHomeTimelineMock = vi.fn();
 
 vi.mock("./backup", () => ({
 	maybeAutoSyncBackup: (...args: unknown[]) => maybeAutoSyncBackupMock(...args),
@@ -21,49 +17,12 @@ vi.mock("./backup", () => ({
 		}),
 }));
 
-vi.mock("./dms-live", () => ({
-	syncDirectMessagesViaCachedBird: (...args: unknown[]) =>
-		syncDirectMessagesViaCachedBirdMock(...args),
-	syncDirectMessagesViaCachedBirdEffect: (...args: unknown[]) =>
-		Effect.tryPromise({
-			try: () => syncDirectMessagesViaCachedBirdMock(...args),
-			catch: (error) => error,
-		}),
-}));
-
-vi.mock("./mention-threads-live", () => ({
-	syncMentionThreads: (...args: unknown[]) => syncMentionThreadsMock(...args),
-	syncMentionThreadsEffect: (...args: unknown[]) =>
-		Effect.tryPromise({
-			try: () => syncMentionThreadsMock(...args),
-			catch: (error) => error,
-		}),
-}));
-
-vi.mock("./mentions-live", () => ({
-	syncMentions: (...args: unknown[]) => syncMentionsMock(...args),
-	syncMentionsEffect: (...args: unknown[]) =>
-		Effect.tryPromise({
-			try: () => syncMentionsMock(...args),
-			catch: (error) => error,
-		}),
-}));
-
 vi.mock("./timeline-collections-live", () => ({
 	syncTimelineCollection: (...args: unknown[]) =>
 		syncTimelineCollectionMock(...args),
 	syncTimelineCollectionEffect: (...args: unknown[]) =>
 		Effect.tryPromise({
 			try: () => syncTimelineCollectionMock(...args),
-			catch: (error) => error,
-		}),
-}));
-
-vi.mock("./timeline-live", () => ({
-	syncHomeTimeline: (...args: unknown[]) => syncHomeTimelineMock(...args),
-	syncHomeTimelineEffect: (...args: unknown[]) =>
-		Effect.tryPromise({
-			try: () => syncHomeTimelineMock(...args),
 			catch: (error) => error,
 		}),
 }));
@@ -111,11 +70,7 @@ describe("web sync dispatcher", () => {
 		clearWebSyncLocksForTests();
 		vi.useRealTimers();
 		maybeAutoSyncBackupMock.mockReset();
-		syncDirectMessagesViaCachedBirdMock.mockReset();
-		syncMentionThreadsMock.mockReset();
-		syncMentionsMock.mockReset();
 		syncTimelineCollectionMock.mockReset();
-		syncHomeTimelineMock.mockReset();
 		maybeAutoSyncBackupMock.mockResolvedValue({
 			ok: true,
 			enabled: false,
@@ -136,108 +91,14 @@ describe("web sync dispatcher", () => {
 		}
 	});
 
-	it("syncs the home timeline with a live refresh and backup pass", async () => {
-		syncHomeTimelineMock.mockResolvedValue({
-			ok: true,
-			source: "bird",
-			count: 42,
-		});
-
-		const result = await runWebSync("timeline");
-
-		expect(syncHomeTimelineMock).toHaveBeenCalledWith(
-			expect.objectContaining({
-				limit: 100,
-				following: true,
-				refresh: true,
-			}),
-		);
-		expect(maybeAutoSyncBackupMock).toHaveBeenCalled();
-		expect(result).toMatchObject({
-			ok: true,
-			kind: "timeline",
-			summary: "Synced 42 items",
-			steps: [{ kind: "timeline", count: 42, source: "bird" }],
-		});
-	});
-
-	it("passes dm request sync options through to Bird", async () => {
-		syncDirectMessagesViaCachedBirdMock.mockResolvedValue({
-			ok: true,
-			source: "bird",
-			conversations: 12,
-			messages: 34,
-		});
-
-		const result = await runWebSync("dms", undefined, {
-			inbox: "requests",
-			limit: 200,
-			maxPages: 3,
-		});
-
-		expect(syncDirectMessagesViaCachedBirdMock).toHaveBeenCalledWith({
-			account: undefined,
-			inbox: "requests",
-			limit: 200,
-			maxPages: 3,
-			pageDelayMs: 750,
-			refresh: true,
-		});
-		expect(result).toMatchObject({
-			ok: true,
-			kind: "dms",
-			summary: "Synced 34 items",
-			steps: [{ kind: "dms", count: 34, source: "bird" }],
-		});
-	});
-
-	it("syncs mentions and then hydrates mention thread context", async () => {
-		syncMentionsMock.mockResolvedValue({
-			ok: true,
-			source: "xurl",
-			count: 8,
-			partial: false,
-		});
-		syncMentionThreadsMock.mockResolvedValue({
-			ok: true,
-			source: "xurl",
-			mergedTweets: 17,
-			partial: true,
-			warnings: ["rate limited"],
-		});
-
-		const result = await runWebSync("mentions");
-
-		expect(syncMentionsMock).toHaveBeenCalledWith({
-			account: undefined,
-			mode: "auto",
-			limit: 100,
-			maxPages: 3,
-			refresh: true,
-		});
-		expect(syncMentionThreadsMock).toHaveBeenCalledWith({
-			account: undefined,
-			mode: "xurl",
-			limit: 30,
-			delayMs: 1500,
-			timeoutMs: 15000,
-		});
-		expect(result.summary).toBe("Synced 25 items (partial)");
-		expect(result.steps.at(1)).toMatchObject({
-			kind: "mention-threads",
-			count: 17,
-			warnings: ["rate limited"],
-		});
-	});
-
-	it("syncs saved collections through the shared collection path", async () => {
+	it("syncs saved collections through the shared collection path and backup pass", async () => {
 		syncTimelineCollectionMock.mockResolvedValue({
 			ok: true,
 			source: "bird",
 			count: 11,
 		});
 
-		await runWebSync("bookmarks");
+		const result = await runWebSync("bookmarks");
 
 		expect(syncTimelineCollectionMock).toHaveBeenCalledWith({
 			kind: "bookmarks",
@@ -246,6 +107,13 @@ describe("web sync dispatcher", () => {
 			maxPages: 5,
 			refresh: true,
 			earlyStop: true,
+		});
+		expect(maybeAutoSyncBackupMock).toHaveBeenCalled();
+		expect(result).toMatchObject({
+			ok: true,
+			kind: "bookmarks",
+			summary: "Synced 11 items",
+			steps: [{ kind: "bookmarks", count: 11, source: "bird" }],
 		});
 	});
 
@@ -292,62 +160,56 @@ describe("web sync dispatcher", () => {
 
 	it("returns an in-progress response for duplicate sync clicks", async () => {
 		const pending = deferred<{ ok: boolean; source: string; count: number }>();
-		syncHomeTimelineMock.mockReturnValue(pending.promise);
+		syncTimelineCollectionMock.mockReturnValue(pending.promise);
 
-		const first = runWebSync("timeline");
-		const second = await runWebSync("timeline");
+		const first = runWebSync("bookmarks");
+		const second = await runWebSync("bookmarks");
 		pending.resolve({ ok: true, source: "bird", count: 1 });
 		await first;
 
 		expect(second).toMatchObject({
 			ok: false,
-			kind: "timeline",
+			kind: "bookmarks",
 			inProgress: true,
 			summary: "Sync already running",
 		});
-		expect(syncHomeTimelineMock).toHaveBeenCalledTimes(1);
+		expect(syncTimelineCollectionMock).toHaveBeenCalledTimes(1);
 	});
 
 	it("does not start a sync while constructing the Effect", async () => {
 		const pending = deferred<{ ok: boolean; source: string; count: number }>();
-		syncHomeTimelineMock.mockReturnValue(pending.promise);
+		syncTimelineCollectionMock.mockReturnValue(pending.promise);
 
-		const effect = runWebSyncEffect("timeline");
+		const effect = runWebSyncEffect("bookmarks");
 
-		expect(syncHomeTimelineMock).not.toHaveBeenCalled();
+		expect(syncTimelineCollectionMock).not.toHaveBeenCalled();
 
 		const result = Effect.runPromise(effect);
-		expect(syncHomeTimelineMock).toHaveBeenCalledTimes(1);
+		expect(syncTimelineCollectionMock).toHaveBeenCalledTimes(1);
 		pending.resolve({ ok: true, source: "bird", count: 1 });
 
 		await expect(result).resolves.toMatchObject({
 			ok: true,
-			kind: "timeline",
+			kind: "bookmarks",
 		});
 	});
 
 	it("keeps account-aware running locks scoped by account", async () => {
 		const primary = deferred<{ ok: boolean; source: string; count: number }>();
 		const studio = deferred<{ ok: boolean; source: string; count: number }>();
-		syncMentionsMock
+		syncTimelineCollectionMock
 			.mockReturnValueOnce(primary.promise)
 			.mockReturnValueOnce(studio.promise);
-		syncMentionThreadsMock.mockResolvedValue({
-			ok: true,
-			source: "xurl",
-			mergedTweets: 0,
-			partial: false,
-		});
 
-		const primaryJob = startWebSync("mentions", "acct_primary");
-		const studioJob = startWebSync("mentions", "acct_studio");
+		const primaryJob = startWebSync("likes", "acct_primary");
+		const studioJob = startWebSync("likes", "acct_studio");
 
 		expect(primaryJob.id).not.toBe(studioJob.id);
-		expect(syncMentionsMock).toHaveBeenNthCalledWith(
+		expect(syncTimelineCollectionMock).toHaveBeenNthCalledWith(
 			1,
 			expect.objectContaining({ account: "acct_primary" }),
 		);
-		expect(syncMentionsMock).toHaveBeenNthCalledWith(
+		expect(syncTimelineCollectionMock).toHaveBeenNthCalledWith(
 			2,
 			expect.objectContaining({ account: "acct_studio" }),
 		);
@@ -366,69 +228,16 @@ describe("web sync dispatcher", () => {
 		});
 	});
 
-	it("keeps timeline web syncs account-scoped", async () => {
-		const pending = deferred<{ ok: boolean; source: string; count: number }>();
-		syncHomeTimelineMock.mockReturnValue(pending.promise);
-
-		const defaultJob = startWebSync("timeline");
-		const selectedJob = startWebSync("timeline", "acct_studio");
-
-		expect(selectedJob.id).not.toBe(defaultJob.id);
-		expect(selectedJob.accountId).toBe("acct_studio");
-		expect(syncHomeTimelineMock).toHaveBeenCalledTimes(2);
-		expect(syncHomeTimelineMock).toHaveBeenNthCalledWith(
-			1,
-			expect.objectContaining({ account: undefined, mode: "auto" }),
-		);
-		expect(syncHomeTimelineMock).toHaveBeenNthCalledWith(
-			2,
-			expect.objectContaining({ account: "acct_studio", mode: "xurl" }),
-		);
-
-		pending.resolve({ ok: true, source: "bird", count: 1 });
-		await vi.waitFor(() => {
-			expect(getWebSyncJob(defaultJob.id)).toMatchObject({
-				status: "succeeded",
-			});
-		});
-	});
-
-	it("keeps auto fallback for default-account timeline syncs", async () => {
-		setupDefaultAccount("acct_studio");
-		syncHomeTimelineMock.mockResolvedValue({
-			ok: true,
-			source: "bird",
-			count: 7,
-		});
-
-		await runWebSync("timeline", "acct_studio");
-
-		expect(syncHomeTimelineMock).toHaveBeenCalledWith({
-			account: "acct_studio",
-			mode: "auto",
-			limit: 100,
-			maxPages: 3,
-			following: true,
-			refresh: true,
-		});
-	});
-
 	it("treats omitted account and the default account as the same running sync", async () => {
 		setupDefaultAccount("acct_studio");
 		const pending = deferred<{ ok: boolean; source: string; count: number }>();
-		syncMentionsMock.mockReturnValue(pending.promise);
-		syncMentionThreadsMock.mockResolvedValue({
-			ok: true,
-			source: "xurl",
-			mergedTweets: 0,
-			partial: false,
-		});
+		syncTimelineCollectionMock.mockReturnValue(pending.promise);
 
-		const defaultJob = startWebSync("mentions");
-		const explicitDefaultJob = startWebSync("mentions", "acct_studio");
+		const defaultJob = startWebSync("likes");
+		const explicitDefaultJob = startWebSync("likes", "acct_studio");
 
 		expect(explicitDefaultJob.id).toBe(defaultJob.id);
-		expect(syncMentionsMock).toHaveBeenCalledTimes(1);
+		expect(syncTimelineCollectionMock).toHaveBeenCalledTimes(1);
 
 		pending.resolve({ ok: true, source: "bird", count: 1 });
 		await vi.waitFor(() => {
@@ -440,12 +249,12 @@ describe("web sync dispatcher", () => {
 
 	it("tracks background sync jobs through completion", async () => {
 		const pending = deferred<{ ok: boolean; source: string; count: number }>();
-		syncHomeTimelineMock.mockReturnValue(pending.promise);
+		syncTimelineCollectionMock.mockReturnValue(pending.promise);
 
-		const job = startWebSync("timeline");
+		const job = startWebSync("bookmarks");
 
 		expect(job).toMatchObject({
-			kind: "timeline",
+			kind: "bookmarks",
 			status: "running",
 			inProgress: true,
 		});
@@ -462,9 +271,9 @@ describe("web sync dispatcher", () => {
 	});
 
 	it("keeps non-Error background failure messages in job snapshots", async () => {
-		syncHomeTimelineMock.mockRejectedValue("rate limited");
+		syncTimelineCollectionMock.mockRejectedValue("rate limited");
 
-		const job = startWebSync("timeline");
+		const job = startWebSync("bookmarks");
 
 		await vi.waitFor(() => {
 			expect(getWebSyncJob(job.id)).toMatchObject({
@@ -477,13 +286,13 @@ describe("web sync dispatcher", () => {
 
 	it("expires completed background sync jobs after the polling window", async () => {
 		vi.useFakeTimers();
-		syncHomeTimelineMock.mockResolvedValue({
+		syncTimelineCollectionMock.mockResolvedValue({
 			ok: true,
 			source: "bird",
 			count: 5,
 		});
 
-		const job = startWebSync("timeline");
+		const job = startWebSync("bookmarks");
 		await vi.waitFor(() => {
 			expect(getWebSyncJob(job.id)).toMatchObject({
 				status: "succeeded",
@@ -498,6 +307,8 @@ describe("web sync dispatcher", () => {
 
 	it("parses only supported sync kinds", () => {
 		expect(parseWebSyncKind("likes")).toBe("likes");
+		expect(parseWebSyncKind("bookmarks")).toBe("bookmarks");
+		expect(parseWebSyncKind("timeline")).toBeNull();
 		expect(parseWebSyncKind("blocks")).toBeNull();
 		expect(parseWebSyncKind(undefined)).toBeNull();
 	});

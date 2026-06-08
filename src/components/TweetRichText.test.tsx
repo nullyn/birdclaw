@@ -182,6 +182,30 @@ describe("TweetRichText", () => {
 		expect(screen.queryByText(/t\.co\/photo/)).toBeNull();
 	});
 
+	it("decodes HTML entities in plain text regions", () => {
+		const { container } = render(
+			<TweetRichText
+				text="you &amp; me &gt; cool https://t.co/demo"
+				entities={{
+					urls: [
+						{
+							url: "https://t.co/demo",
+							expandedUrl: "https://example.com/demo",
+							displayUrl: "example.com/demo",
+							start: 23,
+							end: 40,
+						},
+					],
+				}}
+			/>,
+		);
+
+		expect(container).toHaveTextContent("you & me > cool");
+		expect(
+			screen.getByRole("link", { name: "example.com/demo" }),
+		).toHaveAttribute("href", "https://example.com/demo");
+	});
+
 	it("keeps unsafe url entity text visible as plain text", () => {
 		const { container } = render(
 			<TweetRichText

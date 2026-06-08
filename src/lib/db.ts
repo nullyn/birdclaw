@@ -92,6 +92,8 @@ export interface TweetsTable {
 	author_profile_id: string;
 	kind: string;
 	text: string;
+	text_en: string | null;
+	lang: string | null;
 	created_at: string;
 	is_replied: number;
 	reply_to_id: string | null;
@@ -112,6 +114,16 @@ export interface TweetCollectionsTable {
 	source: string;
 	raw_json: string;
 	updated_at: string;
+}
+
+export interface TweetMetadataTable {
+	tweet_id: string;
+	keywords_json: string;
+	summary: string | null;
+	image_labels_json: string;
+	urls_json: string;
+	model: string | null;
+	generated_at: string | null;
 }
 
 export interface TweetAccountEdgesTable {
@@ -298,6 +310,7 @@ export interface BirdclawDatabase {
 	identity_search_index: IdentitySearchIndexTable;
 	tweets: TweetsTable;
 	tweet_collections: TweetCollectionsTable;
+	tweet_metadata: TweetMetadataTable;
 	tweet_account_edges: TweetAccountEdgesTable;
 	dm_conversations: DmConversationsTable;
 	dm_messages: DmMessagesTable;
@@ -698,6 +711,16 @@ function ensureTweetMetadataColumns(db: Database) {
 	}
 }
 
+function ensureTweetTranslationColumns(db: Database) {
+	const columnNames = getColumnNames(db, "tweets");
+	if (!columnNames.has("text_en")) {
+		db.exec("alter table tweets add column text_en text");
+	}
+	if (!columnNames.has("lang")) {
+		db.exec("alter table tweets add column lang text");
+	}
+}
+
 function ensureProfileAvatarColumns(db: Database) {
 	const columnNames = getColumnNames(db, "profiles");
 	if (!columnNames.has("following_count")) {
@@ -761,6 +784,20 @@ function ensureTweetCollectionsTable(db: Database) {
       raw_json text not null default '{}',
       updated_at text not null,
       primary key (account_id, tweet_id, kind)
+    );
+  `);
+}
+
+function ensureTweetMetadataTable(db: Database) {
+	db.exec(`
+    create table if not exists tweet_metadata (
+      tweet_id text primary key,
+      keywords_json text not null default '[]',
+      summary text,
+      image_labels_json text not null default '[]',
+      urls_json text not null default '[]',
+      model text,
+      generated_at text
     );
   `);
 }
@@ -1015,8 +1052,10 @@ function initDatabase(options: InitDatabaseOptions = {}) {
 		ensureAccountExternalUserIdColumn(nativeDb);
 		ensureDmConversationInboxColumns(nativeDb);
 		ensureTweetMetadataColumns(nativeDb);
+		ensureTweetTranslationColumns(nativeDb);
 		ensureProfileAvatarColumns(nativeDb);
 		ensureTweetCollectionsTable(nativeDb);
+		ensureTweetMetadataTable(nativeDb);
 		ensureTweetAccountEdgesTable(nativeDb);
 		ensureProfileAffiliationsTable(nativeDb);
 		ensureProfileSnapshotsTable(nativeDb);

@@ -12,6 +12,7 @@ import {
 	tweetLinkClass,
 	tweetMentionClass,
 } from "#/lib/ui";
+import { decodeHtmlEntities } from "#/lib/html-entities";
 import { safeHttpUrl } from "#/lib/url-safety";
 import { ProfilePreview } from "./ProfilePreview";
 
@@ -63,7 +64,7 @@ export function TweetRichText({
 
 				let node: ReactNode = (
 					<Fragment key={`segment-${String(index)}`}>
-						{text.slice(segment.start, segment.end)}
+						{decodeHtmlEntities(text.slice(segment.start, segment.end))}
 					</Fragment>
 				);
 				if (segment.kind === "url" && hiddenRangeKeys.has(rangeKey(segment))) {
@@ -117,12 +118,12 @@ export function TweetRichText({
 
 				return (
 					<Fragment key={`piece-${String(index)}`}>
-						{prefix}
+						{decodeHtmlEntities(prefix)}
 						{node}
 					</Fragment>
 				);
 			})}
-			{text.slice(cursor)}
+			{decodeHtmlEntities(text.slice(cursor))}
 		</Wrapper>
 	);
 }

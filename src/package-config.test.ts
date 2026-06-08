@@ -80,6 +80,7 @@ describe("package configuration", () => {
 		expect(config.test?.exclude).toEqual([
 			...configDefaults.exclude,
 			"playwright/**/*",
+			"src/router.test.ts",
 		]);
 		expect(config.test?.coverage?.exclude).toEqual([
 			...coverageConfigDefaults.exclude,
@@ -87,8 +88,6 @@ describe("package configuration", () => {
 			"src/styles.css",
 			"src/lib/types.ts",
 			"src/routes/*.tsx",
-			"src/routes/api/data-sources.tsx",
-			"src/routes/api/network-map.tsx",
 		]);
 	});
 });

@@ -2,16 +2,24 @@
 import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+	generateTweetImageLabels,
+	generateTweetTextMetadata,
 	scoreInboxItemWithOpenAI,
 	scoreInboxItemWithOpenAIEffect,
 } from "./openai";
 
 beforeEach(() => {
 	process.env.OPENAI_API_KEY = "";
+	delete process.env.OLLAMA_API_KEY;
+	delete process.env.OPENROUTER_API_KEY;
+	delete process.env.BIRDCLAW_AI_PROVIDER;
 });
 
 afterEach(() => {
 	process.env.OPENAI_API_KEY = "";
+	delete process.env.OLLAMA_API_KEY;
+	delete process.env.OPENROUTER_API_KEY;
+	delete process.env.BIRDCLAW_AI_PROVIDER;
 	delete process.env.BIRDCLAW_OPENAI_MODEL;
 	vi.unstubAllGlobals();
 });
@@ -149,5 +157,161 @@ describe("openai inbox scoring", () => {
 				},
 			}),
 		).rejects.toThrow("no content");
+	});
+});
+
+describe("tweet metadata generation", () => {
+	it("can call Ollama Cloud directly for text metadata", async () => {
+		process.env.BIRDCLAW_AI_PROVIDER = "ollama";
+		process.env.OLLAMA_API_KEY = "ollama-key";
+		process.env.BIRDCLAW_OPENAI_MODEL = "deepseek-v4-flash";
+		const fetchMock = vi.fn().mockResolvedValue(
+			new Response(
+				JSON.stringify({
+					message: {
+						content: JSON.stringify({
+							keywords: ["ai evals", "agent tooling"],
+							summary: "An AI eval tool for agent workflows.",
+						}),
+					},
+				}),
+			),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		const result = await generateTweetTextMetadata({
+			tweetId: "tweet_1",
+			text: "New eval platform for agents",
+		});
+
+		expect(result).toEqual({
+			model: "deepseek-v4-flash",
+			keywords: ["ai evals", "agent tooling"],
+			summary: "An AI eval tool for agent workflows.",
+		});
+		expect(fetchMock).toHaveBeenCalledWith(
+			"https://ollama.com/api/chat",
+			expect.objectContaining({
+				method: "POST",
+				headers: expect.objectContaining({
+					authorization: "Bearer ollama-key",
+					"content-type": "application/json",
+				}),
+			}),
+		);
+		const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+		expect(body).toMatchObject({
+			model: "deepseek-v4-flash",
+			stream: false,
+		});
+		expect(body).not.toHaveProperty("format");
+	});
+
+	it("skips image labeling on Ollama Cloud text-only metadata models", async () => {
+		process.env.BIRDCLAW_AI_PROVIDER = "ollama";
+		process.env.OLLAMA_API_KEY = "ollama-key";
+		process.env.BIRDCLAW_OPENAI_MODEL = "deepseek-v4-flash";
+		const fetchMock = vi.fn();
+		vi.stubGlobal("fetch", fetchMock);
+
+		await expect(
+			generateTweetImageLabels({
+				tweetId: "tweet_1",
+				text: "Screenshot",
+				media: [{ media_url_https: "https://example.com/image.jpg" }],
+			}),
+		).resolves.toEqual({
+			model: "deepseek-v4-flash",
+			labels: [],
+		});
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it("can call OpenRouter for text metadata", async () => {
+		process.env.BIRDCLAW_AI_PROVIDER = "openrouter";
+		process.env.OPENROUTER_API_KEY = "openrouter-key";
+		process.env.BIRDCLAW_OPENAI_MODEL =
+			"nvidia/nemotron-3-super-120b-a12b:free";
+		const fetchMock = vi.fn().mockResolvedValue(
+			new Response(
+				JSON.stringify({
+					choices: [
+						{
+							message: {
+								content: JSON.stringify({
+									keywords: ["ai search", "agent memory"],
+									summary: "An AI search tool for agent memory.",
+								}),
+							},
+						},
+					],
+				}),
+			),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		const result = await generateTweetTextMetadata({
+			tweetId: "tweet_1",
+			text: "New AI search tool for agent memory",
+		});
+
+		expect(result).toEqual({
+			model: "nvidia/nemotron-3-super-120b-a12b:free",
+			keywords: ["ai search", "agent memory"],
+			summary: "An AI search tool for agent memory.",
+		});
+		expect(fetchMock).toHaveBeenCalledWith(
+			"https://openrouter.ai/api/v1/chat/completions",
+			expect.objectContaining({
+				method: "POST",
+				headers: expect.objectContaining({
+					authorization: "Bearer openrouter-key",
+					"content-type": "application/json",
+				}),
+			}),
+		);
+		const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+		expect(body).toMatchObject({
+			model: "nvidia/nemotron-3-super-120b-a12b:free",
+			response_format: { type: "json_object" },
+		});
+	});
+
+	it("can call OpenRouter for image labels", async () => {
+		process.env.BIRDCLAW_AI_PROVIDER = "openrouter";
+		process.env.OPENROUTER_API_KEY = "openrouter-key";
+		process.env.BIRDCLAW_OPENAI_MODEL =
+			"nvidia/nemotron-3-super-120b-a12b:free";
+		const fetchMock = vi.fn().mockResolvedValue(
+			new Response(
+				JSON.stringify({
+					choices: [
+						{
+							message: {
+								content: JSON.stringify({
+									labels: ["dashboard", "workflow builder"],
+								}),
+							},
+						},
+					],
+				}),
+			),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		await expect(
+			generateTweetImageLabels({
+				tweetId: "tweet_1",
+				text: "Screenshot",
+				media: [{ media_url_https: "https://example.com/image.jpg" }],
+			}),
+		).resolves.toEqual({
+			model: "nvidia/nemotron-3-super-120b-a12b:free",
+			labels: ["dashboard", "workflow builder"],
+		});
+		expect(fetchMock).toHaveBeenCalledWith(
+			"https://openrouter.ai/api/v1/chat/completions",
+			expect.any(Object),
+		);
 	});
 });

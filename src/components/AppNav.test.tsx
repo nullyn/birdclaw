@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "#/lib/theme";
 
-const routerState = vi.hoisted(() => ({ path: "/inbox" }));
+const routerState = vi.hoisted(() => ({ path: "/bookmarks" }));
 
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({
@@ -37,7 +37,7 @@ vi.mock("./AccountSwitcher", () => ({
 import { AppNav } from "./AppNav";
 
 afterEach(() => {
-	routerState.path = "/inbox";
+	routerState.path = "/bookmarks";
 	cleanup();
 });
 
@@ -49,17 +49,14 @@ describe("AppNav", () => {
 			</ThemeProvider>,
 		);
 
-		expect(screen.getByRole("link", { name: "Inbox" })).toHaveClass(
+		expect(screen.getByRole("link", { name: "Bookmarks" })).toHaveClass(
 			"nav-link-active",
 		);
-		expect(screen.getByRole("link", { name: "Inbox" })).toHaveAttribute(
+		expect(screen.getByRole("link", { name: "Bookmarks" })).toHaveAttribute(
 			"aria-label",
-			"Inbox",
+			"Bookmarks",
 		);
-		expect(screen.getByRole("link", { name: "Blocks" })).toBeInTheDocument();
-		expect(
-			screen.getByRole("link", { name: "Rate Limits" }),
-		).toBeInTheDocument();
+		expect(screen.getByRole("link", { name: "Likes" })).toBeInTheDocument();
 		expect(
 			screen.getByText("Fast search for your archive."),
 		).toBeInTheDocument();
@@ -86,20 +83,20 @@ describe("AppNav", () => {
 	});
 
 	it("uses icon-rail chrome when compact", () => {
-		routerState.path = "/dms";
+		routerState.path = "/likes";
 		render(
 			<ThemeProvider>
 				<AppNav compact />
 			</ThemeProvider>,
 		);
 
-		expect(screen.getByRole("link", { name: "DMs" })).toHaveClass(
+		expect(screen.getByRole("link", { name: "Likes" })).toHaveClass(
 			"nav-link-active",
 		);
-		expect(screen.getByRole("link", { name: "DMs" })).toHaveClass(
+		expect(screen.getByRole("link", { name: "Likes" })).toHaveClass(
 			"justify-center",
 		);
 		expect(screen.getByText("birdclaw").parentElement).toHaveClass("sr-only");
-		expect(screen.getByText("DMs")).toHaveClass("sr-only");
+		expect(screen.getByText("Likes")).toHaveClass("sr-only");
 	});
 });

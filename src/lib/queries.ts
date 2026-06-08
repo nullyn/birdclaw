@@ -16,12 +16,14 @@ import type {
 	QueryEnvelope,
 	QueryResponse,
 	ReplyFilter,
+	ResourceKind,
 	TimelineQualityFilter,
 	TimelineItem,
 	TimelineQuery,
 	TweetEntities,
 	TweetConversationResponse,
 	TweetMediaItem,
+	TweetMetadata,
 	TweetUrlEntity,
 } from "./types";
 import {
@@ -158,6 +160,82 @@ function parseJsonField<T>(value: unknown, fallback: T): T {
 	} catch {
 		return fallback;
 	}
+}
+
+function parseStringArrayField(value: unknown) {
+	return parseJsonField<unknown[]>(value, [])
+		.map((item) => String(item).trim())
+		.filter((item) => item.length > 0);
+}
+
+function parseTweetMetadataRow(row: Record<string, unknown>): TweetMetadata {
+	return {
+		keywords: parseStringArrayField(row.keywords_json),
+		...(typeof row.summary === "string" && row.summary.length > 0
+			? { summary: row.summary }
+			: {}),
+		imageLabels: parseStringArrayField(row.image_labels_json),
+		urls: parseStringArrayField(row.urls_json),
+		...(typeof row.model === "string" && row.model.length > 0
+			? { model: row.model }
+			: {}),
+		...(typeof row.generated_at === "string" && row.generated_at.length > 0
+			? { generatedAt: row.generated_at }
+			: {}),
+	};
+}
+
+function loadTweetMetadataMap(db: Database, tweetIds: string[]) {
+	const uniqueIds = Array.from(new Set(tweetIds.filter((id) => id.length > 0)));
+	const metadata = new Map<string, TweetMetadata>();
+	if (uniqueIds.length === 0) {
+		return metadata;
+	}
+
+	const placeholders = uniqueIds.map(() => "?").join(", ");
+	const rows = db
+		.prepare(
+			`
+      select *
+      from tweet_metadata
+      where tweet_id in (${placeholders})
+      `,
+		)
+		.all(...uniqueIds) as Array<Record<string, unknown>>;
+	for (const row of rows) {
+		metadata.set(String(row.tweet_id), parseTweetMetadataRow(row));
+	}
+	return metadata;
+}
+
+function attachEmbeddedTweetMetadata(
+	tweet: EmbeddedTweet | null | undefined,
+	metadata: Map<string, TweetMetadata>,
+) {
+	if (!tweet) {
+		return tweet;
+	}
+	const tweetMetadata = metadata.get(tweet.id);
+	return tweetMetadata ? { ...tweet, metadata: tweetMetadata } : tweet;
+}
+
+function attachTimelineMetadata(
+	items: TimelineItem[],
+	metadata: Map<string, TweetMetadata>,
+) {
+	return items.map((item) => {
+		const itemMetadata = metadata.get(item.id);
+		return {
+			...item,
+			...(itemMetadata ? { metadata: itemMetadata } : {}),
+			replyToTweet: attachEmbeddedTweetMetadata(item.replyToTweet, metadata),
+			quotedTweet: attachEmbeddedTweetMetadata(item.quotedTweet, metadata),
+			retweetedTweet: attachEmbeddedTweetMetadata(
+				item.retweetedTweet,
+				metadata,
+			),
+		};
+	});
 }
 
 function normalizeProfileHandle(handle: string) {
@@ -410,6 +488,14 @@ function buildEmbeddedTweet(
 	return {
 		id: String(row[`${prefix}id`]),
 		text,
+		textEn:
+			typeof row[`${prefix}text_en`] === "string"
+				? String(row[`${prefix}text_en`])
+				: null,
+		lang:
+			typeof row[`${prefix}lang`] === "string"
+				? String(row[`${prefix}lang`])
+				: null,
 		createdAt: String(row[`${prefix}created_at`] ?? new Date(0).toISOString()),
 		replyToId:
 			typeof row[`${prefix}reply_to_id`] === "string"
@@ -796,7 +882,13 @@ export function listTimelineItems({
 	limit = 18,
 }: TimelineQuery): TimelineItem[] {
 	const db = getNativeDb();
-	const kind = resource === "mentions" ? "mention" : resource;
+	const isLikesResource = resource === "likes";
+	const isBookmarksResource = resource === "bookmarks";
+	const timelineResource =
+		isLikesResource || isBookmarksResource ? "home" : resource;
+	const effectiveLikedOnly = likedOnly || isLikesResource;
+	const effectiveBookmarkedOnly = bookmarkedOnly || isBookmarksResource;
+	const kind = timelineResource === "mentions" ? "mention" : timelineResource;
 	const params: Array<string | number> = [];
 	const normalizedLowQualityThreshold =
 		normalizeLowQualityThreshold(lowQualityThreshold);
@@ -826,8 +918,8 @@ export function listTimelineItems({
 	let searchSnippetSelect = "";
 
 	const canUseRecentEdgeWindow =
-		!likedOnly &&
-		!bookmarkedOnly &&
+		!effectiveLikedOnly &&
+		!effectiveBookmarkedOnly &&
 		!account &&
 		!search?.trim() &&
 		replyFilter === "all" &&
@@ -836,8 +928,8 @@ export function listTimelineItems({
 		includeReplies &&
 		qualityFilter === "all";
 
-	if (likedOnly || bookmarkedOnly) {
-		if (likedOnly && bookmarkedOnly) {
+	if (effectiveLikedOnly || effectiveBookmarkedOnly) {
+		if (effectiveLikedOnly && effectiveBookmarkedOnly) {
 			timelineEdgesCte = `
         with timeline_edges as (
           select likes.account_id, likes.tweet_id, 'home' as kind, likes.raw_json
@@ -862,8 +954,8 @@ export function listTimelineItems({
         )
       `;
 		} else {
-			const collectionKind = likedOnly ? "likes" : "bookmarks";
-			const legacyColumn = likedOnly ? "liked" : "bookmarked";
+			const collectionKind = effectiveLikedOnly ? "likes" : "bookmarks";
+			const legacyColumn = effectiveLikedOnly ? "liked" : "bookmarked";
 			timelineEdgesCte = `
         with timeline_edges as (
           select account_id, tweet_id, 'home' as kind, raw_json
@@ -1003,6 +1095,8 @@ export function listTimelineItems({
         e.kind,
         e.raw_json as edge_raw_json,
         t.text,
+        t.text_en,
+        t.lang,
         t.created_at,
         t.reply_to_id,
         t.is_replied,
@@ -1046,6 +1140,8 @@ export function listTimelineItems({
         p.created_at as profile_created_at,
         rt.id as reply_id,
         rt.text as reply_text,
+        rt.text_en as reply_text_en,
+        rt.lang as reply_lang,
         rt.created_at as reply_created_at,
         rt.reply_to_id as reply_reply_to_id,
         rt.entities_json as reply_entities_json,
@@ -1061,6 +1157,8 @@ export function listTimelineItems({
         rp.created_at as reply_profile_created_at,
         qt.id as quoted_id,
         qt.text as quoted_text,
+        qt.text_en as quoted_text_en,
+        qt.lang as quoted_lang,
         qt.created_at as quoted_created_at,
         qt.reply_to_id as quoted_reply_to_id,
         qt.entities_json as quoted_entities_json,
@@ -1101,7 +1199,7 @@ export function listTimelineItems({
 
 	const urlExpansionCache: UrlExpansionCache = new Map();
 	const profileByHandleCache: ProfileByHandleCache = new Map();
-	return rows.map((row) => {
+	const items = rows.map((row) => {
 		const author = {
 			id: String(row.profile_id),
 			handle: String(row.handle),
@@ -1164,6 +1262,8 @@ export function listTimelineItems({
 			accountHandle: String(row.account_handle),
 			kind: row.kind as TimelineItem["kind"],
 			text,
+			textEn: typeof row.text_en === "string" ? String(row.text_en) : null,
+			lang: typeof row.lang === "string" ? String(row.lang) : null,
 			...(typeof row.search_snippet === "string"
 				? { searchSnippet: row.search_snippet }
 				: {}),
@@ -1209,6 +1309,13 @@ export function listTimelineItems({
 				}
 			: item;
 	});
+	const metadataIds = items.flatMap((item) => [
+		item.id,
+		...(item.replyToTweet ? [item.replyToTweet.id] : []),
+		...(item.quotedTweet ? [item.quotedTweet.id] : []),
+		...(item.retweetedTweet ? [item.retweetedTweet.id] : []),
+	]);
+	return attachTimelineMetadata(items, loadTweetMetadataMap(db, metadataIds));
 }
 
 function conversationTweetSelect(accountId?: string) {
@@ -1241,6 +1348,8 @@ function conversationTweetSelect(accountId?: string) {
   select
     t.id,
     t.text,
+    t.text_en,
+    t.lang,
     t.created_at,
     t.reply_to_id,
     t.is_replied,
@@ -1965,7 +2074,7 @@ function getDmSearchMatches({
 }
 
 export function queryResource(
-	resource: "home" | "mentions" | "authored" | "search" | "dms",
+	resource: ResourceKind,
 	filters: (TimelineQuery | DmQuery) & { conversationId?: string },
 ): QueryResponse {
 	if (resource === "dms") {

@@ -10,42 +10,19 @@ const DEFAULT_ITERATIONS = 5;
 const READY_TIMEOUT_MS = 20_000;
 
 const SCENARIOS = {
-	home: {
-		path: "/",
+	bookmarks: {
+		path: "/bookmarks",
 		ready: async (page) => waitForAny(page, ['[data-perf="timeline-card"]']),
 	},
-	mentions: {
-		path: "/mentions",
+	likes: {
+		path: "/likes",
 		ready: async (page) => waitForAny(page, ['[data-perf="timeline-card"]']),
 	},
-	"mentions-search": {
-		path: "/mentions",
+	"bookmarks-search": {
+		path: "/bookmarks",
 		ready: async (page) => {
-			await page.getByPlaceholder("Search mentions").fill("peekaboo");
+			await page.getByPlaceholder("Search bookmarks").fill("agent");
 			await waitForAny(page, ['[data-perf="timeline-card"]']);
-		},
-	},
-	links: {
-		path: "/links",
-		ready: async (page) =>
-			waitForAny(page, [
-				'[data-perf="link-insight-row"]',
-				"text=No links in this window.",
-			]),
-	},
-	"links-toggle": {
-		path: "/links",
-		ready: async (page) =>
-			waitForAny(page, [
-				'[data-perf="link-insight-row"]',
-				"text=No links in this window.",
-			]),
-		action: async (page) => {
-			await page.getByRole("button", { name: "videos" }).click();
-			await waitForAny(page, [
-				'[data-perf="link-insight-row"]',
-				"text=No links in this window.",
-			]);
 		},
 	},
 };
@@ -179,8 +156,8 @@ function round(value) {
 
 function apiBucket(rawUrl) {
 	const url = new URL(rawUrl);
-	if (url.pathname === "/api/link-insights") {
-		return `${url.pathname}:${url.searchParams.get("kind") ?? "unknown"}`;
+	if (url.pathname === "/api/query") {
+		return `${url.pathname}:${url.searchParams.get("resource") ?? "unknown"}`;
 	}
 	return url.pathname;
 }

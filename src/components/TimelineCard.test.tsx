@@ -130,6 +130,37 @@ describe("TimelineCard", () => {
 		expect(onReply).toHaveBeenCalledWith("tweet_1");
 	});
 
+	it("prefers translated text for the main tweet and embedded tweets", () => {
+		render(
+			<TimelineCard
+				item={{
+					...item,
+					text: "これはAIツールです",
+					textEn: "This is an AI tool.",
+					lang: "ja",
+					entities: {},
+					replyToTweet: null,
+					quotedTweet: {
+						...item.quotedTweet,
+						text: "最新モデルを発表しました",
+						textEn: "We announced the latest model.",
+						lang: "ja",
+					},
+				}}
+				onReply={vi.fn()}
+			/>,
+		);
+
+		expect(screen.getByText("This is an AI tool.")).toBeInTheDocument();
+		expect(
+			screen.getByText("We announced the latest model."),
+		).toBeInTheDocument();
+		expect(screen.queryByText("これはAIツールです")).not.toBeInTheDocument();
+		expect(
+			screen.queryByText("最新モデルを発表しました"),
+		).not.toBeInTheDocument();
+	});
+
 	it("renders retweets as the original tweet with repost attribution", () => {
 		const fetchMock = vi.fn().mockResolvedValue({
 			ok: true,

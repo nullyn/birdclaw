@@ -27,96 +27,60 @@ describe("api sync route", () => {
 
 	it("starts a supported sync kind as a background job", async () => {
 		startWebSyncMock.mockReturnValue({
-			id: "sync_timeline_1",
-			kind: "timeline",
+			id: "sync_bookmarks_1",
+			kind: "bookmarks",
 			accountId: "acct_primary",
 			status: "running",
 			startedAt: "2026-05-15T12:00:00.000Z",
-			summary: "Syncing Home timeline",
+			summary: "Syncing Bookmarks",
 			inProgress: true,
 		});
 
 		const response = await POST({
 			request: new Request("http://localhost/api/sync", {
 				method: "POST",
-				body: JSON.stringify({ kind: "timeline", accountId: "acct_primary" }),
+				body: JSON.stringify({ kind: "bookmarks", accountId: "acct_primary" }),
 			}),
 		});
 
 		expect(response.status).toBe(202);
-		expect(startWebSyncMock).toHaveBeenCalledWith(
-			"timeline",
-			"acct_primary",
-			{},
-		);
+		expect(startWebSyncMock).toHaveBeenCalledWith("bookmarks", "acct_primary");
 		expect(await response.json()).toMatchObject({
-			id: "sync_timeline_1",
+			id: "sync_bookmarks_1",
 			accountId: "acct_primary",
 			status: "running",
-			summary: "Syncing Home timeline",
+			summary: "Syncing Bookmarks",
 		});
 	});
 
 	it("returns an existing running job for duplicate sync starts", async () => {
 		startWebSyncMock.mockReturnValue({
-			id: "sync_mentions_1",
-			kind: "mentions",
+			id: "sync_likes_1",
+			kind: "likes",
 			status: "running",
 			startedAt: "2026-05-15T12:00:00.000Z",
 			inProgress: true,
-			summary: "Syncing Mentions",
+			summary: "Syncing Likes",
 		});
 
 		const response = await POST({
 			request: new Request("http://localhost/api/sync", {
 				method: "POST",
-				body: JSON.stringify({ kind: "mentions" }),
+				body: JSON.stringify({ kind: "likes" }),
 			}),
 		});
 
 		expect(response.status).toBe(202);
 		expect(await response.json()).toMatchObject({
-			id: "sync_mentions_1",
+			id: "sync_likes_1",
 			inProgress: true,
-		});
-	});
-
-	it("passes supported dm sync options to the background job", async () => {
-		startWebSyncMock.mockReturnValue({
-			id: "sync_dms_1",
-			kind: "dms",
-			status: "running",
-			startedAt: "2026-05-15T12:00:00.000Z",
-			inProgress: true,
-			summary: "Syncing Direct messages",
-		});
-
-		const response = await POST({
-			request: new Request("http://localhost/api/sync", {
-				method: "POST",
-				body: JSON.stringify({
-					kind: "dms",
-					inbox: "requests",
-					limit: 200,
-					maxPages: 3,
-					allPages: false,
-				}),
-			}),
-		});
-
-		expect(response.status).toBe(202);
-		expect(startWebSyncMock).toHaveBeenCalledWith("dms", undefined, {
-			inbox: "requests",
-			limit: 200,
-			maxPages: 3,
-			allPages: false,
 		});
 	});
 
 	it("returns sync job status by id", async () => {
 		getWebSyncJobMock.mockReturnValue({
-			id: "sync_timeline_1",
-			kind: "timeline",
+			id: "sync_bookmarks_1",
+			kind: "bookmarks",
 			status: "succeeded",
 			startedAt: "2026-05-15T12:00:00.000Z",
 			finishedAt: "2026-05-15T12:00:02.000Z",
@@ -124,7 +88,7 @@ describe("api sync route", () => {
 			inProgress: false,
 			result: {
 				ok: true,
-				kind: "timeline",
+				kind: "bookmarks",
 				startedAt: "2026-05-15T12:00:00.000Z",
 				finishedAt: "2026-05-15T12:00:02.000Z",
 				summary: "Synced 5 items",
@@ -133,11 +97,11 @@ describe("api sync route", () => {
 		});
 
 		const response = await GET({
-			request: new Request("http://localhost/api/sync?id=sync_timeline_1"),
+			request: new Request("http://localhost/api/sync?id=sync_bookmarks_1"),
 		});
 
 		expect(response.status).toBe(200);
-		expect(getWebSyncJobMock).toHaveBeenCalledWith("sync_timeline_1");
+		expect(getWebSyncJobMock).toHaveBeenCalledWith("sync_bookmarks_1");
 		expect(await response.json()).toMatchObject({ status: "succeeded" });
 	});
 

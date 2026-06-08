@@ -9,92 +9,19 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TodayRouteImport } from './routes/today'
-import { Route as RateLimitsRouteImport } from './routes/rate-limits'
-import { Route as ProfileAnalyzeRouteImport } from './routes/profile-analyze'
-import { Route as NetworkMapRouteImport } from './routes/network-map'
-import { Route as MentionsRouteImport } from './routes/mentions'
-import { Route as LinksRouteImport } from './routes/links'
 import { Route as LikesRouteImport } from './routes/likes'
-import { Route as InboxRouteImport } from './routes/inbox'
-import { Route as DmsRouteImport } from './routes/dms'
-import { Route as DiscussRouteImport } from './routes/discuss'
-import { Route as DataSourcesRouteImport } from './routes/data-sources'
 import { Route as BookmarksRouteImport } from './routes/bookmarks'
-import { Route as BlocksRouteImport } from './routes/blocks'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ProfilesHandleRouteImport } from './routes/profiles.$handle'
-import { Route as ApiXurlRateLimitsRouteImport } from './routes/api/xurl-rate-limits'
 import { Route as ApiSyncRouteImport } from './routes/api/sync'
 import { Route as ApiStatusRouteImport } from './routes/api/status'
-import { Route as ApiSearchDiscussionRouteImport } from './routes/api/search-discussion'
 import { Route as ApiQueryRouteImport } from './routes/api/query'
-import { Route as ApiProfileHydrateRouteImport } from './routes/api/profile-hydrate'
-import { Route as ApiProfileAnalysisRouteImport } from './routes/api/profile-analysis'
-import { Route as ApiPeriodDigestRouteImport } from './routes/api/period-digest'
-import { Route as ApiNetworkMapRouteImport } from './routes/api/network-map'
-import { Route as ApiLinkPreviewRouteImport } from './routes/api/link-preview'
-import { Route as ApiLinkInsightsRouteImport } from './routes/api/link-insights'
-import { Route as ApiInboxRouteImport } from './routes/api/inbox'
-import { Route as ApiDataSourcesRouteImport } from './routes/api/data-sources'
 import { Route as ApiConversationRouteImport } from './routes/api/conversation'
-import { Route as ApiBlocksRouteImport } from './routes/api/blocks'
 import { Route as ApiAvatarRouteImport } from './routes/api/avatar'
 import { Route as ApiActionRouteImport } from './routes/api/action'
 
-const TodayRoute = TodayRouteImport.update({
-  id: '/today',
-  path: '/today',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RateLimitsRoute = RateLimitsRouteImport.update({
-  id: '/rate-limits',
-  path: '/rate-limits',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProfileAnalyzeRoute = ProfileAnalyzeRouteImport.update({
-  id: '/profile-analyze',
-  path: '/profile-analyze',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NetworkMapRoute = NetworkMapRouteImport.update({
-  id: '/network-map',
-  path: '/network-map',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MentionsRoute = MentionsRouteImport.update({
-  id: '/mentions',
-  path: '/mentions',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LinksRoute = LinksRouteImport.update({
-  id: '/links',
-  path: '/links',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LikesRoute = LikesRouteImport.update({
   id: '/likes',
   path: '/likes',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const InboxRoute = InboxRouteImport.update({
-  id: '/inbox',
-  path: '/inbox',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DmsRoute = DmsRouteImport.update({
-  id: '/dms',
-  path: '/dms',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DiscussRoute = DiscussRouteImport.update({
-  id: '/discuss',
-  path: '/discuss',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DataSourcesRoute = DataSourcesRouteImport.update({
-  id: '/data-sources',
-  path: '/data-sources',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BookmarksRoute = BookmarksRouteImport.update({
@@ -102,24 +29,9 @@ const BookmarksRoute = BookmarksRouteImport.update({
   path: '/bookmarks',
   getParentRoute: () => rootRouteImport,
 } as any)
-const BlocksRoute = BlocksRouteImport.update({
-  id: '/blocks',
-  path: '/blocks',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProfilesHandleRoute = ProfilesHandleRouteImport.update({
-  id: '/profiles/$handle',
-  path: '/profiles/$handle',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiXurlRateLimitsRoute = ApiXurlRateLimitsRouteImport.update({
-  id: '/api/xurl-rate-limits',
-  path: '/api/xurl-rate-limits',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSyncRoute = ApiSyncRouteImport.update({
@@ -132,64 +44,14 @@ const ApiStatusRoute = ApiStatusRouteImport.update({
   path: '/api/status',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSearchDiscussionRoute = ApiSearchDiscussionRouteImport.update({
-  id: '/api/search-discussion',
-  path: '/api/search-discussion',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiQueryRoute = ApiQueryRouteImport.update({
   id: '/api/query',
   path: '/api/query',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiProfileHydrateRoute = ApiProfileHydrateRouteImport.update({
-  id: '/api/profile-hydrate',
-  path: '/api/profile-hydrate',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiProfileAnalysisRoute = ApiProfileAnalysisRouteImport.update({
-  id: '/api/profile-analysis',
-  path: '/api/profile-analysis',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPeriodDigestRoute = ApiPeriodDigestRouteImport.update({
-  id: '/api/period-digest',
-  path: '/api/period-digest',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiNetworkMapRoute = ApiNetworkMapRouteImport.update({
-  id: '/api/network-map',
-  path: '/api/network-map',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiLinkPreviewRoute = ApiLinkPreviewRouteImport.update({
-  id: '/api/link-preview',
-  path: '/api/link-preview',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiLinkInsightsRoute = ApiLinkInsightsRouteImport.update({
-  id: '/api/link-insights',
-  path: '/api/link-insights',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiInboxRoute = ApiInboxRouteImport.update({
-  id: '/api/inbox',
-  path: '/api/inbox',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiDataSourcesRoute = ApiDataSourcesRouteImport.update({
-  id: '/api/data-sources',
-  path: '/api/data-sources',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiConversationRoute = ApiConversationRouteImport.update({
   id: '/api/conversation',
   path: '/api/conversation',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBlocksRoute = ApiBlocksRouteImport.update({
-  id: '/api/blocks',
-  path: '/api/blocks',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAvatarRoute = ApiAvatarRouteImport.update({
@@ -205,324 +67,93 @@ const ApiActionRoute = ApiActionRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/blocks': typeof BlocksRoute
   '/bookmarks': typeof BookmarksRoute
-  '/data-sources': typeof DataSourcesRoute
-  '/discuss': typeof DiscussRoute
-  '/dms': typeof DmsRoute
-  '/inbox': typeof InboxRoute
   '/likes': typeof LikesRoute
-  '/links': typeof LinksRoute
-  '/mentions': typeof MentionsRoute
-  '/network-map': typeof NetworkMapRoute
-  '/profile-analyze': typeof ProfileAnalyzeRoute
-  '/rate-limits': typeof RateLimitsRoute
-  '/today': typeof TodayRoute
   '/api/action': typeof ApiActionRoute
   '/api/avatar': typeof ApiAvatarRoute
-  '/api/blocks': typeof ApiBlocksRoute
   '/api/conversation': typeof ApiConversationRoute
-  '/api/data-sources': typeof ApiDataSourcesRoute
-  '/api/inbox': typeof ApiInboxRoute
-  '/api/link-insights': typeof ApiLinkInsightsRoute
-  '/api/link-preview': typeof ApiLinkPreviewRoute
-  '/api/network-map': typeof ApiNetworkMapRoute
-  '/api/period-digest': typeof ApiPeriodDigestRoute
-  '/api/profile-analysis': typeof ApiProfileAnalysisRoute
-  '/api/profile-hydrate': typeof ApiProfileHydrateRoute
   '/api/query': typeof ApiQueryRoute
-  '/api/search-discussion': typeof ApiSearchDiscussionRoute
   '/api/status': typeof ApiStatusRoute
   '/api/sync': typeof ApiSyncRoute
-  '/api/xurl-rate-limits': typeof ApiXurlRateLimitsRoute
-  '/profiles/$handle': typeof ProfilesHandleRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/blocks': typeof BlocksRoute
   '/bookmarks': typeof BookmarksRoute
-  '/data-sources': typeof DataSourcesRoute
-  '/discuss': typeof DiscussRoute
-  '/dms': typeof DmsRoute
-  '/inbox': typeof InboxRoute
   '/likes': typeof LikesRoute
-  '/links': typeof LinksRoute
-  '/mentions': typeof MentionsRoute
-  '/network-map': typeof NetworkMapRoute
-  '/profile-analyze': typeof ProfileAnalyzeRoute
-  '/rate-limits': typeof RateLimitsRoute
-  '/today': typeof TodayRoute
   '/api/action': typeof ApiActionRoute
   '/api/avatar': typeof ApiAvatarRoute
-  '/api/blocks': typeof ApiBlocksRoute
   '/api/conversation': typeof ApiConversationRoute
-  '/api/data-sources': typeof ApiDataSourcesRoute
-  '/api/inbox': typeof ApiInboxRoute
-  '/api/link-insights': typeof ApiLinkInsightsRoute
-  '/api/link-preview': typeof ApiLinkPreviewRoute
-  '/api/network-map': typeof ApiNetworkMapRoute
-  '/api/period-digest': typeof ApiPeriodDigestRoute
-  '/api/profile-analysis': typeof ApiProfileAnalysisRoute
-  '/api/profile-hydrate': typeof ApiProfileHydrateRoute
   '/api/query': typeof ApiQueryRoute
-  '/api/search-discussion': typeof ApiSearchDiscussionRoute
   '/api/status': typeof ApiStatusRoute
   '/api/sync': typeof ApiSyncRoute
-  '/api/xurl-rate-limits': typeof ApiXurlRateLimitsRoute
-  '/profiles/$handle': typeof ProfilesHandleRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/blocks': typeof BlocksRoute
   '/bookmarks': typeof BookmarksRoute
-  '/data-sources': typeof DataSourcesRoute
-  '/discuss': typeof DiscussRoute
-  '/dms': typeof DmsRoute
-  '/inbox': typeof InboxRoute
   '/likes': typeof LikesRoute
-  '/links': typeof LinksRoute
-  '/mentions': typeof MentionsRoute
-  '/network-map': typeof NetworkMapRoute
-  '/profile-analyze': typeof ProfileAnalyzeRoute
-  '/rate-limits': typeof RateLimitsRoute
-  '/today': typeof TodayRoute
   '/api/action': typeof ApiActionRoute
   '/api/avatar': typeof ApiAvatarRoute
-  '/api/blocks': typeof ApiBlocksRoute
   '/api/conversation': typeof ApiConversationRoute
-  '/api/data-sources': typeof ApiDataSourcesRoute
-  '/api/inbox': typeof ApiInboxRoute
-  '/api/link-insights': typeof ApiLinkInsightsRoute
-  '/api/link-preview': typeof ApiLinkPreviewRoute
-  '/api/network-map': typeof ApiNetworkMapRoute
-  '/api/period-digest': typeof ApiPeriodDigestRoute
-  '/api/profile-analysis': typeof ApiProfileAnalysisRoute
-  '/api/profile-hydrate': typeof ApiProfileHydrateRoute
   '/api/query': typeof ApiQueryRoute
-  '/api/search-discussion': typeof ApiSearchDiscussionRoute
   '/api/status': typeof ApiStatusRoute
   '/api/sync': typeof ApiSyncRoute
-  '/api/xurl-rate-limits': typeof ApiXurlRateLimitsRoute
-  '/profiles/$handle': typeof ProfilesHandleRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/blocks'
     | '/bookmarks'
-    | '/data-sources'
-    | '/discuss'
-    | '/dms'
-    | '/inbox'
     | '/likes'
-    | '/links'
-    | '/mentions'
-    | '/network-map'
-    | '/profile-analyze'
-    | '/rate-limits'
-    | '/today'
     | '/api/action'
     | '/api/avatar'
-    | '/api/blocks'
     | '/api/conversation'
-    | '/api/data-sources'
-    | '/api/inbox'
-    | '/api/link-insights'
-    | '/api/link-preview'
-    | '/api/network-map'
-    | '/api/period-digest'
-    | '/api/profile-analysis'
-    | '/api/profile-hydrate'
     | '/api/query'
-    | '/api/search-discussion'
     | '/api/status'
     | '/api/sync'
-    | '/api/xurl-rate-limits'
-    | '/profiles/$handle'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/blocks'
     | '/bookmarks'
-    | '/data-sources'
-    | '/discuss'
-    | '/dms'
-    | '/inbox'
     | '/likes'
-    | '/links'
-    | '/mentions'
-    | '/network-map'
-    | '/profile-analyze'
-    | '/rate-limits'
-    | '/today'
     | '/api/action'
     | '/api/avatar'
-    | '/api/blocks'
     | '/api/conversation'
-    | '/api/data-sources'
-    | '/api/inbox'
-    | '/api/link-insights'
-    | '/api/link-preview'
-    | '/api/network-map'
-    | '/api/period-digest'
-    | '/api/profile-analysis'
-    | '/api/profile-hydrate'
     | '/api/query'
-    | '/api/search-discussion'
     | '/api/status'
     | '/api/sync'
-    | '/api/xurl-rate-limits'
-    | '/profiles/$handle'
   id:
     | '__root__'
     | '/'
-    | '/blocks'
     | '/bookmarks'
-    | '/data-sources'
-    | '/discuss'
-    | '/dms'
-    | '/inbox'
     | '/likes'
-    | '/links'
-    | '/mentions'
-    | '/network-map'
-    | '/profile-analyze'
-    | '/rate-limits'
-    | '/today'
     | '/api/action'
     | '/api/avatar'
-    | '/api/blocks'
     | '/api/conversation'
-    | '/api/data-sources'
-    | '/api/inbox'
-    | '/api/link-insights'
-    | '/api/link-preview'
-    | '/api/network-map'
-    | '/api/period-digest'
-    | '/api/profile-analysis'
-    | '/api/profile-hydrate'
     | '/api/query'
-    | '/api/search-discussion'
     | '/api/status'
     | '/api/sync'
-    | '/api/xurl-rate-limits'
-    | '/profiles/$handle'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  BlocksRoute: typeof BlocksRoute
   BookmarksRoute: typeof BookmarksRoute
-  DataSourcesRoute: typeof DataSourcesRoute
-  DiscussRoute: typeof DiscussRoute
-  DmsRoute: typeof DmsRoute
-  InboxRoute: typeof InboxRoute
   LikesRoute: typeof LikesRoute
-  LinksRoute: typeof LinksRoute
-  MentionsRoute: typeof MentionsRoute
-  NetworkMapRoute: typeof NetworkMapRoute
-  ProfileAnalyzeRoute: typeof ProfileAnalyzeRoute
-  RateLimitsRoute: typeof RateLimitsRoute
-  TodayRoute: typeof TodayRoute
   ApiActionRoute: typeof ApiActionRoute
   ApiAvatarRoute: typeof ApiAvatarRoute
-  ApiBlocksRoute: typeof ApiBlocksRoute
   ApiConversationRoute: typeof ApiConversationRoute
-  ApiDataSourcesRoute: typeof ApiDataSourcesRoute
-  ApiInboxRoute: typeof ApiInboxRoute
-  ApiLinkInsightsRoute: typeof ApiLinkInsightsRoute
-  ApiLinkPreviewRoute: typeof ApiLinkPreviewRoute
-  ApiNetworkMapRoute: typeof ApiNetworkMapRoute
-  ApiPeriodDigestRoute: typeof ApiPeriodDigestRoute
-  ApiProfileAnalysisRoute: typeof ApiProfileAnalysisRoute
-  ApiProfileHydrateRoute: typeof ApiProfileHydrateRoute
   ApiQueryRoute: typeof ApiQueryRoute
-  ApiSearchDiscussionRoute: typeof ApiSearchDiscussionRoute
   ApiStatusRoute: typeof ApiStatusRoute
   ApiSyncRoute: typeof ApiSyncRoute
-  ApiXurlRateLimitsRoute: typeof ApiXurlRateLimitsRoute
-  ProfilesHandleRoute: typeof ProfilesHandleRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/today': {
-      id: '/today'
-      path: '/today'
-      fullPath: '/today'
-      preLoaderRoute: typeof TodayRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/rate-limits': {
-      id: '/rate-limits'
-      path: '/rate-limits'
-      fullPath: '/rate-limits'
-      preLoaderRoute: typeof RateLimitsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/profile-analyze': {
-      id: '/profile-analyze'
-      path: '/profile-analyze'
-      fullPath: '/profile-analyze'
-      preLoaderRoute: typeof ProfileAnalyzeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/network-map': {
-      id: '/network-map'
-      path: '/network-map'
-      fullPath: '/network-map'
-      preLoaderRoute: typeof NetworkMapRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mentions': {
-      id: '/mentions'
-      path: '/mentions'
-      fullPath: '/mentions'
-      preLoaderRoute: typeof MentionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/links': {
-      id: '/links'
-      path: '/links'
-      fullPath: '/links'
-      preLoaderRoute: typeof LinksRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/likes': {
       id: '/likes'
       path: '/likes'
       fullPath: '/likes'
       preLoaderRoute: typeof LikesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/inbox': {
-      id: '/inbox'
-      path: '/inbox'
-      fullPath: '/inbox'
-      preLoaderRoute: typeof InboxRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dms': {
-      id: '/dms'
-      path: '/dms'
-      fullPath: '/dms'
-      preLoaderRoute: typeof DmsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/discuss': {
-      id: '/discuss'
-      path: '/discuss'
-      fullPath: '/discuss'
-      preLoaderRoute: typeof DiscussRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/data-sources': {
-      id: '/data-sources'
-      path: '/data-sources'
-      fullPath: '/data-sources'
-      preLoaderRoute: typeof DataSourcesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/bookmarks': {
@@ -532,32 +163,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BookmarksRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/blocks': {
-      id: '/blocks'
-      path: '/blocks'
-      fullPath: '/blocks'
-      preLoaderRoute: typeof BlocksRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/profiles/$handle': {
-      id: '/profiles/$handle'
-      path: '/profiles/$handle'
-      fullPath: '/profiles/$handle'
-      preLoaderRoute: typeof ProfilesHandleRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/xurl-rate-limits': {
-      id: '/api/xurl-rate-limits'
-      path: '/api/xurl-rate-limits'
-      fullPath: '/api/xurl-rate-limits'
-      preLoaderRoute: typeof ApiXurlRateLimitsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/sync': {
@@ -574,13 +184,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/search-discussion': {
-      id: '/api/search-discussion'
-      path: '/api/search-discussion'
-      fullPath: '/api/search-discussion'
-      preLoaderRoute: typeof ApiSearchDiscussionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/query': {
       id: '/api/query'
       path: '/api/query'
@@ -588,74 +191,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiQueryRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/profile-hydrate': {
-      id: '/api/profile-hydrate'
-      path: '/api/profile-hydrate'
-      fullPath: '/api/profile-hydrate'
-      preLoaderRoute: typeof ApiProfileHydrateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/profile-analysis': {
-      id: '/api/profile-analysis'
-      path: '/api/profile-analysis'
-      fullPath: '/api/profile-analysis'
-      preLoaderRoute: typeof ApiProfileAnalysisRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/period-digest': {
-      id: '/api/period-digest'
-      path: '/api/period-digest'
-      fullPath: '/api/period-digest'
-      preLoaderRoute: typeof ApiPeriodDigestRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/network-map': {
-      id: '/api/network-map'
-      path: '/api/network-map'
-      fullPath: '/api/network-map'
-      preLoaderRoute: typeof ApiNetworkMapRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/link-preview': {
-      id: '/api/link-preview'
-      path: '/api/link-preview'
-      fullPath: '/api/link-preview'
-      preLoaderRoute: typeof ApiLinkPreviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/link-insights': {
-      id: '/api/link-insights'
-      path: '/api/link-insights'
-      fullPath: '/api/link-insights'
-      preLoaderRoute: typeof ApiLinkInsightsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/inbox': {
-      id: '/api/inbox'
-      path: '/api/inbox'
-      fullPath: '/api/inbox'
-      preLoaderRoute: typeof ApiInboxRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/data-sources': {
-      id: '/api/data-sources'
-      path: '/api/data-sources'
-      fullPath: '/api/data-sources'
-      preLoaderRoute: typeof ApiDataSourcesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/conversation': {
       id: '/api/conversation'
       path: '/api/conversation'
       fullPath: '/api/conversation'
       preLoaderRoute: typeof ApiConversationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/blocks': {
-      id: '/api/blocks'
-      path: '/api/blocks'
-      fullPath: '/api/blocks'
-      preLoaderRoute: typeof ApiBlocksRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/avatar': {
@@ -677,37 +217,14 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  BlocksRoute: BlocksRoute,
   BookmarksRoute: BookmarksRoute,
-  DataSourcesRoute: DataSourcesRoute,
-  DiscussRoute: DiscussRoute,
-  DmsRoute: DmsRoute,
-  InboxRoute: InboxRoute,
   LikesRoute: LikesRoute,
-  LinksRoute: LinksRoute,
-  MentionsRoute: MentionsRoute,
-  NetworkMapRoute: NetworkMapRoute,
-  ProfileAnalyzeRoute: ProfileAnalyzeRoute,
-  RateLimitsRoute: RateLimitsRoute,
-  TodayRoute: TodayRoute,
   ApiActionRoute: ApiActionRoute,
   ApiAvatarRoute: ApiAvatarRoute,
-  ApiBlocksRoute: ApiBlocksRoute,
   ApiConversationRoute: ApiConversationRoute,
-  ApiDataSourcesRoute: ApiDataSourcesRoute,
-  ApiInboxRoute: ApiInboxRoute,
-  ApiLinkInsightsRoute: ApiLinkInsightsRoute,
-  ApiLinkPreviewRoute: ApiLinkPreviewRoute,
-  ApiNetworkMapRoute: ApiNetworkMapRoute,
-  ApiPeriodDigestRoute: ApiPeriodDigestRoute,
-  ApiProfileAnalysisRoute: ApiProfileAnalysisRoute,
-  ApiProfileHydrateRoute: ApiProfileHydrateRoute,
   ApiQueryRoute: ApiQueryRoute,
-  ApiSearchDiscussionRoute: ApiSearchDiscussionRoute,
   ApiStatusRoute: ApiStatusRoute,
   ApiSyncRoute: ApiSyncRoute,
-  ApiXurlRateLimitsRoute: ApiXurlRateLimitsRoute,
-  ProfilesHandleRoute: ProfilesHandleRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

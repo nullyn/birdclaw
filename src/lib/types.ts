@@ -1,4 +1,11 @@
-export type ResourceKind = "home" | "mentions" | "authored" | "search" | "dms";
+export type ResourceKind =
+	| "home"
+	| "mentions"
+	| "authored"
+	| "search"
+	| "likes"
+	| "bookmarks"
+	| "dms";
 export type InboxKind = "mixed" | "mentions" | "dms";
 
 export type ReplyFilter = "all" | "replied" | "unreplied";
@@ -125,6 +132,8 @@ export interface TweetMediaItem {
 export interface EmbeddedTweet {
 	id: string;
 	text: string;
+	textEn?: string | null;
+	lang?: string | null;
 	createdAt: string;
 	replyToId?: string | null;
 	isReplied?: boolean;
@@ -135,6 +144,7 @@ export interface EmbeddedTweet {
 	author: ProfileRecord;
 	entities: TweetEntities;
 	media: TweetMediaItem[];
+	metadata?: TweetMetadata;
 }
 
 export interface TweetConversationResponse {
@@ -167,6 +177,8 @@ export interface TimelineItem {
 	accountHandle: string;
 	kind: "home" | "mention" | "authored" | "search" | "like" | "bookmark";
 	text: string;
+	textEn?: string | null;
+	lang?: string | null;
 	searchSnippet?: string;
 	createdAt: string;
 	replyToId?: string | null;
@@ -178,10 +190,20 @@ export interface TimelineItem {
 	author: ProfileRecord;
 	entities: TweetEntities;
 	media: TweetMediaItem[];
+	metadata?: TweetMetadata;
 	replyToTweet?: EmbeddedTweet | null;
 	quotedTweet?: EmbeddedTweet | null;
 	retweetedTweet?: EmbeddedTweet | null;
 	qualityReason?: string | null;
+}
+
+export interface TweetMetadata {
+	keywords: string[];
+	summary?: string;
+	imageLabels: string[];
+	urls: string[];
+	model?: string;
+	generatedAt?: string;
 }
 
 export interface DmMessageItem {
@@ -642,6 +664,7 @@ export interface XurlMentionsResponse {
 	includes?: {
 		users?: XurlMentionUser[];
 		media?: XurlMediaItem[];
+		tweets?: XurlTweetData[];
 	};
 	meta?: Record<string, unknown>;
 }

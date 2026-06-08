@@ -1055,9 +1055,16 @@ function listTimelineCollectionViaXurlEffect({
 			maxResults,
 			isPaginatedWalk,
 		);
+		// Bookmarks also pull the single referenced (quoted/retweeted) parent post
+		// and its author so it can be persisted and indexed (see AGENTS.md §2). Likes
+		// are not parent-indexed, so they keep the lighter expansion set.
+		const expansions =
+			collection === "bookmarks"
+				? `${AUTHOR_MEDIA_EXPANSIONS},referenced_tweets.id,referenced_tweets.id.author_id`
+				: AUTHOR_MEDIA_EXPANSIONS;
 		const query = new URLSearchParams({
 			max_results: String(requestMaxResults),
-			expansions: AUTHOR_MEDIA_EXPANSIONS,
+			expansions,
 			"tweet.fields":
 				"created_at,conversation_id,entities,public_metrics,referenced_tweets",
 			"media.fields": MEDIA_FIELDS,

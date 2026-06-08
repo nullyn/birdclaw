@@ -23,6 +23,7 @@ import {
 	listTimelineItems,
 	queryResource,
 } from "./queries";
+import type { TimelineItem } from "./types";
 
 const mocks = vi.hoisted(() => ({
 	findArchives: vi.fn(),
@@ -945,6 +946,9 @@ describe("birdclaw queries", () => {
       `,
 		).run();
 		db.prepare(
+			"update tweets set text_en = 'Translated original tweet content', lang = 'ja' where id = 'tweet_retweeted_original'",
+		).run();
+		db.prepare(
 			`
       insert into tweets (
         id, account_id, author_profile_id, kind, text, created_at,
@@ -1043,6 +1047,8 @@ describe("birdclaw queries", () => {
 		expect(retweetItem?.retweetedTweet).toMatchObject({
 			id: "tweet_retweeted_original",
 			text: "Actual original tweet content",
+			textEn: "Translated original tweet content",
+			lang: "ja",
 			likeCount: 19,
 			mediaCount: 0,
 			bookmarked: true,
@@ -1070,6 +1076,114 @@ describe("birdclaw queries", () => {
 		expect(quotedItem?.quotedTweet?.id).toBe("tweet_001");
 		expect(quotedItem?.quotedTweet?.text).toContain("local-first");
 		expect(quotedItem?.author.avatarUrl).toMatch(/^data:image\/svg\+xml/);
+	});
+
+	it("attaches tweet metadata to bookmark and like query results", () => {
+		setupTempHome();
+		const db = getNativeDb();
+		db.exec(`
+      insert into tweets (
+        id, account_id, author_profile_id, kind, text, created_at,
+        is_replied, reply_to_id, like_count, media_count, bookmarked, liked,
+        entities_json, media_json, quoted_tweet_id
+      ) values
+        (
+          'metadata_parent', 'acct_primary', 'profile_me', 'reference',
+          'Parent AI product', '2026-03-11T12:00:00.000Z',
+          0, null, 5, 0, 0, 0, '{}', '[]', null
+        ),
+        (
+          'metadata_bookmark', 'acct_primary', 'profile_me', 'home',
+          'Bookmark quoting product', '2026-03-11T12:01:00.000Z',
+          0, null, 1, 0, 0, 0, '{}', '[]', 'metadata_parent'
+        ),
+        (
+          'metadata_missing', 'acct_primary', 'profile_me', 'home',
+          'Bookmark without metadata', '2026-03-11T12:02:00.000Z',
+          0, null, 1, 0, 0, 0, '{}', '[]', null
+        ),
+        (
+          'metadata_like', 'acct_primary', 'profile_me', 'home',
+          'Liked product metadata', '2026-03-11T12:03:00.000Z',
+          0, null, 1, 0, 0, 0, '{}', '[]', null
+        );
+
+      insert into tweet_collections (
+        account_id, tweet_id, kind, collected_at, source, raw_json, updated_at
+      ) values
+        (
+          'acct_primary', 'metadata_bookmark', 'bookmarks',
+          '2026-03-11T12:01:00.000Z', 'test', '{}', '2026-03-11T12:01:00.000Z'
+        ),
+        (
+          'acct_primary', 'metadata_missing', 'bookmarks',
+          '2026-03-11T12:02:00.000Z', 'test', '{}', '2026-03-11T12:02:00.000Z'
+        ),
+        (
+          'acct_primary', 'metadata_like', 'likes',
+          '2026-03-11T12:03:00.000Z', 'test', '{}', '2026-03-11T12:03:00.000Z'
+        );
+
+      insert into tweet_metadata (
+        tweet_id, keywords_json, summary, image_labels_json, urls_json, model,
+        generated_at
+      ) values
+        (
+          'metadata_bookmark', '["bookmark keyword"]', 'Bookmark summary',
+          '["screenshot"]', '["https://bookmark.example"]', 'gpt-test',
+          '2026-03-11T12:10:00.000Z'
+        ),
+        (
+          'metadata_parent', '["parent keyword"]', 'Parent summary',
+          '[]', '["https://parent.example"]', 'gpt-test',
+          '2026-03-11T12:11:00.000Z'
+        ),
+        (
+          'metadata_like', '["like keyword"]', 'Like summary',
+          '[]', '["https://like.example"]', 'gpt-test',
+          '2026-03-11T12:12:00.000Z'
+        );
+    `);
+
+		const bookmarkResponse = queryResource("bookmarks", {
+			resource: "bookmarks",
+			limit: 10,
+		});
+		const bookmarkItems = bookmarkResponse.items as TimelineItem[];
+		const bookmarkItem = bookmarkItems.find(
+			(item) => item.id === "metadata_bookmark",
+		);
+		const missingItem = bookmarkItems.find(
+			(item) => item.id === "metadata_missing",
+		);
+		const likeResponse = queryResource("likes", {
+			resource: "likes",
+			limit: 10,
+		});
+		const likeItems = likeResponse.items as TimelineItem[];
+		const likeItem = likeItems.find((item) => item.id === "metadata_like");
+
+		expect(bookmarkItem?.metadata).toEqual({
+			keywords: ["bookmark keyword"],
+			summary: "Bookmark summary",
+			imageLabels: ["screenshot"],
+			urls: ["https://bookmark.example"],
+			model: "gpt-test",
+			generatedAt: "2026-03-11T12:10:00.000Z",
+		});
+		expect(bookmarkItem?.quotedTweet?.metadata).toEqual({
+			keywords: ["parent keyword"],
+			summary: "Parent summary",
+			imageLabels: [],
+			urls: ["https://parent.example"],
+			model: "gpt-test",
+			generatedAt: "2026-03-11T12:11:00.000Z",
+		});
+		expect(missingItem?.metadata).toBeUndefined();
+		expect(likeItem?.metadata).toMatchObject({
+			keywords: ["like keyword"],
+			summary: "Like summary",
+		});
 	});
 
 	it("returns an archived tweet conversation from the root", () => {

@@ -236,6 +236,8 @@ export function TimelineCard({
 	const canReply =
 		showReplyControls && item.kind !== "like" && item.kind !== "bookmark";
 	const displayTweet = item.retweetedTweet ?? item;
+	const displayTweetText = displayTweet.textEn ?? displayTweet.text;
+	const displayTweetEntities = displayTweet.textEn ? {} : displayTweet.entities;
 	const displayTweetId = displayTweet.id;
 	const interactionTweetId =
 		item.retweetedTweet && displayTweetId === `${item.id}:retweeted`
@@ -244,16 +246,16 @@ export function TimelineCard({
 	const displayAuthor = displayTweet.author;
 	const conversation = useConversationSurface(item.id, interactionTweetId);
 	const visibleEntities = getVisibleEntities(
-		displayTweet.entities,
+		displayTweetEntities,
 		displayTweet.media,
 		displayTweet.id,
-		displayTweet.text,
+		displayTweetText,
 	);
 	const hiddenMediaUrlRanges = getHiddenMediaUrlRanges(
-		displayTweet.entities,
+		displayTweetEntities,
 		displayTweet.media,
 		displayTweet.id,
-		displayTweet.text,
+		displayTweetText,
 	);
 	const visibleUrlCards = getVisibleUrlCards(
 		visibleEntities,
@@ -356,9 +358,9 @@ export function TimelineCard({
 					<>
 						<TweetRichText
 							className={feedRowTextClass}
-							entities={displayTweet.entities}
+							entities={displayTweetEntities}
 							hiddenUrlRanges={hiddenMediaUrlRanges}
-							text={displayTweet.text}
+							text={displayTweetText}
 						/>
 						<TweetMediaGrid items={displayTweet.media} />
 						{visibleUrlCards.map((entry, index) => (
@@ -373,9 +375,9 @@ export function TimelineCard({
 					<>
 						<TweetRichText
 							className={feedRowTextClass}
-							entities={item.entities}
+							entities={displayTweetEntities}
 							hiddenUrlRanges={hiddenMediaUrlRanges}
-							text={item.text}
+							text={displayTweetText}
 						/>
 						<TweetMediaGrid items={item.media} />
 						{item.replyToTweet ? (

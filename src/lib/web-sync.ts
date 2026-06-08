@@ -2,23 +2,14 @@ import { existsSync } from "node:fs";
 import { Effect } from "effect";
 import { maybeAutoSyncBackupEffect } from "./backup";
 import { getBirdclawPaths } from "./config";
-import { syncDirectMessagesViaCachedBirdEffect } from "./dms-live";
 import { runEffectBackground, runEffectPromise } from "./effect-runtime";
-import { syncMentionThreadsEffect } from "./mention-threads-live";
-import { syncMentionsEffect } from "./mentions-live";
 import NativeSqliteDatabase from "./sqlite";
 import { syncTimelineCollectionEffect } from "./timeline-collections-live";
-import { syncHomeTimelineEffect } from "./timeline-live";
 
-export type WebSyncKind =
-	| "timeline"
-	| "mentions"
-	| "likes"
-	| "bookmarks"
-	| "dms";
+export type WebSyncKind = "likes" | "bookmarks";
 
 export interface WebSyncStep {
-	kind: WebSyncKind | "mention-threads";
+	kind: WebSyncKind;
 	label: string;
 	count: number;
 	source?: string;
@@ -54,13 +45,9 @@ export interface WebSyncJobSnapshot {
 	error?: string;
 }
 
-export type WebSyncDmInbox = "all" | "accepted" | "requests";
-
 export interface WebSyncOptions {
-	inbox?: WebSyncDmInbox;
 	limit?: number;
 	maxPages?: number;
-	allPages?: boolean;
 }
 
 interface WebSyncPlan {
@@ -101,24 +88,12 @@ function readString(value: unknown, key: string) {
 	return typeof raw === "string" ? raw : undefined;
 }
 
-function readBoolean(value: unknown, key: string) {
-	assertRecord(value);
-	const raw = value[key];
-	return typeof raw === "boolean" ? raw : undefined;
-}
-
 function messageFromError(error: unknown) {
 	return error instanceof Error ? error.message : String(error);
 }
 
 export function parseWebSyncKind(value: unknown): WebSyncKind | null {
-	return value === "timeline" ||
-		value === "mentions" ||
-		value === "likes" ||
-		value === "bookmarks" ||
-		value === "dms"
-		? value
-		: null;
+	return value === "likes" || value === "bookmarks" ? value : null;
 }
 
 function summarizeSteps(steps: WebSyncStep[]) {
@@ -129,75 +104,6 @@ function summarizeSteps(steps: WebSyncStep[]) {
 }
 
 const WEB_SYNC_PLANS: Record<WebSyncKind, WebSyncPlan> = {
-	timeline: {
-		label: "Home timeline",
-		accountAware: true,
-		run: (account) =>
-			Effect.gen(function* () {
-				const result = yield* syncHomeTimelineEffect({
-					account,
-					mode:
-						!account || account === resolveDefaultSyncAccountId()
-							? "auto"
-							: "xurl",
-					limit: 100,
-					maxPages: 3,
-					following: true,
-					refresh: true,
-				});
-				return [
-					{
-						kind: "timeline",
-						label: "Home timeline",
-						count: readNumber(result, "count"),
-						source: readString(result, "source"),
-					},
-				];
-			}),
-	},
-	mentions: {
-		label: "Mentions",
-		accountAware: true,
-		run: (account) =>
-			Effect.gen(function* () {
-				const mentions = yield* syncMentionsEffect({
-					account,
-					mode: "auto",
-					limit: 100,
-					maxPages: 3,
-					refresh: true,
-				});
-				const steps: WebSyncStep[] = [
-					{
-						kind: "mentions",
-						label: "Mentions",
-						count: readNumber(mentions, "count"),
-						source: readString(mentions, "source"),
-						partial: readBoolean(mentions, "partial"),
-					},
-				];
-
-				const threads = yield* syncMentionThreadsEffect({
-					account,
-					mode: "xurl",
-					limit: 30,
-					delayMs: 1500,
-					timeoutMs: 15000,
-				});
-				steps.push({
-					kind: "mention-threads",
-					label: "Mention threads",
-					count: readNumber(threads, "mergedTweets"),
-					source: readString(threads, "source"),
-					partial: readBoolean(threads, "partial"),
-					warnings:
-						Array.isArray(threads.warnings) && threads.warnings.length > 0
-							? threads.warnings.map(String)
-							: undefined,
-				});
-				return steps;
-			}),
-	},
 	likes: {
 		label: "Likes",
 		accountAware: true,
@@ -207,35 +113,6 @@ const WEB_SYNC_PLANS: Record<WebSyncKind, WebSyncPlan> = {
 		label: "Bookmarks",
 		accountAware: true,
 		run: (account) => syncSavedCollection("bookmarks", account),
-	},
-	dms: {
-		label: "Direct messages",
-		accountAware: false,
-		run: (account, options) =>
-			Effect.gen(function* () {
-				const inbox = options.inbox ?? "all";
-				const result = yield* syncDirectMessagesViaCachedBirdEffect({
-					account,
-					inbox,
-					limit: options.limit ?? (inbox === "requests" ? 200 : 50),
-					...(options.maxPages !== undefined
-						? { maxPages: options.maxPages }
-						: {}),
-					...(options.allPages !== undefined
-						? { allPages: options.allPages }
-						: {}),
-					pageDelayMs: inbox === "requests" ? 750 : 0,
-					refresh: true,
-				});
-				return [
-					{
-						kind: "dms",
-						label: "Direct messages",
-						count: readNumber(result, "messages"),
-						source: readString(result, "source"),
-					},
-				];
-			}),
 	},
 };
 
@@ -321,26 +198,7 @@ function resolveDefaultSyncAccountId() {
 	}
 }
 
-function serializeSyncOptions(kind: WebSyncKind, options: WebSyncOptions) {
-	if (kind !== "dms") return "";
-	const parts = [
-		options.inbox ?? "all",
-		options.limit ?? "",
-		options.maxPages ?? "",
-		options.allPages === undefined ? "" : String(options.allPages),
-	];
-	return parts.join(":");
-}
-
-function getRunningSyncKey(
-	kind: WebSyncKind,
-	accountId: string | undefined,
-	options: WebSyncOptions = {},
-) {
-	if (!WEB_SYNC_PLANS[kind].accountAware) {
-		const optionKey = serializeSyncOptions(kind, options);
-		return optionKey ? `${kind}:${optionKey}` : kind;
-	}
+function getRunningSyncKey(kind: WebSyncKind, accountId: string | undefined) {
 	return `${kind}:${accountId ?? resolveDefaultSyncAccountId()}`;
 }
 
@@ -401,7 +259,7 @@ export function startWebSync(
 	options: WebSyncOptions = {},
 ): WebSyncJobSnapshot {
 	const effectiveAccountId = getEffectiveAccountId(kind, accountId);
-	const syncKey = getRunningSyncKey(kind, effectiveAccountId, options);
+	const syncKey = getRunningSyncKey(kind, effectiveAccountId);
 	const current = runningSyncs.get(syncKey);
 	if (current) {
 		return current;
@@ -465,7 +323,7 @@ export function runWebSyncEffect(
 	return Effect.gen(function* () {
 		const effectiveAccountId = getEffectiveAccountId(kind, accountId);
 		const current = runningSyncs.get(
-			getRunningSyncKey(kind, effectiveAccountId, options),
+			getRunningSyncKey(kind, effectiveAccountId),
 		);
 		const startedAt = new Date().toISOString();
 		if (current) {

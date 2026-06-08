@@ -1,21 +1,10 @@
 import { TanStackDevtools } from "@tanstack/react-devtools";
-import {
-	createRootRoute,
-	HeadContent,
-	Scripts,
-	useRouterState,
-} from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import type { ReactNode } from "react";
 import { AppNav } from "#/components/AppNav";
 import { ThemeProvider, themeScript } from "#/lib/theme";
-import {
-	bodyClass,
-	mainColumnClass,
-	mainColumnDmClass,
-	siteShellClass,
-	siteShellDmClass,
-} from "#/lib/ui";
+import { bodyClass, mainColumnClass, siteShellClass } from "#/lib/ui";
 
 import appCss from "../styles.css?url";
 
@@ -53,12 +42,6 @@ function NotFoundView() {
 }
 
 function RootDocument({ children }: { children: ReactNode }) {
-	const pathname = useRouterState({
-		select: (state) => state.location.pathname,
-	});
-	const wideMode =
-		pathname.startsWith("/dms") || pathname.startsWith("/network-map");
-
 	return (
 		<html lang="en" suppressHydrationWarning>
 			<head>
@@ -67,11 +50,9 @@ function RootDocument({ children }: { children: ReactNode }) {
 			</head>
 			<body className={bodyClass}>
 				<ThemeProvider>
-					<div className={wideMode ? siteShellDmClass : siteShellClass}>
-						<AppNav compact={wideMode} />
-						<main className={wideMode ? mainColumnDmClass : mainColumnClass}>
-							{children}
-						</main>
+					<div className={siteShellClass}>
+						<AppNav />
+						<main className={mainColumnClass}>{children}</main>
 					</div>
 				</ThemeProvider>
 				<TanStackDevtools

@@ -16,7 +16,14 @@ import type {
 } from "./web-sync";
 
 const jsonRecordSchema = z.object({}).passthrough();
-const resourceKindSchema = z.enum(["home", "mentions", "authored", "dms"]);
+const resourceKindSchema = z.enum([
+	"home",
+	"mentions",
+	"authored",
+	"likes",
+	"bookmarks",
+	"dms",
+]);
 const webSyncKindSchema = z.enum([
 	"timeline",
 	"mentions",

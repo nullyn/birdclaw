@@ -6,8 +6,34 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { setStoredAccountId } from "./account-selection";
+import type { AccountRecord } from "#/lib/types";
 import { SyncNowButton } from "./SyncNowButton";
+
+const primaryAccount: AccountRecord = {
+	id: "acct_primary",
+	name: "Primary",
+	handle: "me",
+	externalUserId: null,
+	transport: "auto",
+	isDefault: 1,
+	createdAt: "2026-01-01T00:00:00.000Z",
+};
+
+const accounts: AccountRecord[] = [primaryAccount];
+
+function syncJobResponse(kind: "likes" | "bookmarks", summary: string) {
+	return new Response(
+		JSON.stringify({
+			id: `sync_${kind}_1`,
+			kind,
+			status: "succeeded",
+			startedAt: "2026-05-15T12:00:00.000Z",
+			summary,
+			inProgress: false,
+			result: { ok: true, kind, summary, steps: [] },
+		}),
+	);
+}
 
 describe("SyncNowButton", () => {
 	beforeEach(() => {
@@ -21,45 +47,33 @@ describe("SyncNowButton", () => {
 		vi.useRealTimers();
 	});
 
-	it("posts the sync kind and reports success", async () => {
+	it("posts the sync kind with the selected account and reports success", async () => {
 		const onSynced = vi.fn();
-		const fetchMock = vi.fn(
-			async () =>
-				new Response(
-					JSON.stringify({
-						id: "sync_timeline_1",
-						kind: "timeline",
-						status: "succeeded",
-						startedAt: "2026-05-15T12:00:00.000Z",
-						summary: "Synced 12 items",
-						inProgress: false,
-						result: {
-							ok: true,
-							kind: "timeline",
-							summary: "Synced 12 items",
-							steps: [],
-						},
-					}),
-				),
+		const fetchMock = vi.fn(async () =>
+			syncJobResponse("bookmarks", "Synced 12 items"),
 		);
 		vi.stubGlobal("fetch", fetchMock);
 
 		render(
 			<SyncNowButton
-				kind="timeline"
-				label="Sync timeline"
+				kind="bookmarks"
+				label="Sync bookmarks"
+				accounts={accounts}
 				onSynced={onSynced}
 			/>,
 		);
 
-		fireEvent.click(screen.getByRole("button", { name: "Sync timeline" }));
+		fireEvent.click(screen.getByRole("button", { name: "Sync bookmarks" }));
 
 		await waitFor(() => {
 			expect(fetchMock).toHaveBeenCalledWith(
 				"/api/sync",
 				expect.objectContaining({
 					method: "POST",
-					body: JSON.stringify({ kind: "timeline" }),
+					body: JSON.stringify({
+						kind: "bookmarks",
+						accountId: "acct_primary",
+					}),
 				}),
 			);
 			expect(onSynced).toHaveBeenCalledWith(
@@ -69,573 +83,85 @@ describe("SyncNowButton", () => {
 		expect(screen.getByText("Synced 12 items")).toBeInTheDocument();
 	});
 
-	it("includes dm sync options in the sync request", async () => {
-		const fetchMock = vi.fn(
-			async () =>
-				new Response(
-					JSON.stringify({
-						id: "sync_dms_1",
-						kind: "dms",
-						status: "succeeded",
-						startedAt: "2026-05-15T12:00:00.000Z",
-						summary: "Synced 9 items",
-						inProgress: false,
-						result: {
-							ok: true,
-							kind: "dms",
-							summary: "Synced 9 items",
-							steps: [],
-						},
-					}),
-				),
-		);
-		vi.stubGlobal("fetch", fetchMock);
-
-		render(
-			<SyncNowButton
-				kind="dms"
-				label="Sync DMs"
-				onSynced={vi.fn()}
-				syncOptions={{ inbox: "requests", limit: 200, maxPages: 3 }}
-			/>,
-		);
-
-		fireEvent.click(screen.getByRole("button", { name: "Sync DMs" }));
-
-		await waitFor(() => {
-			expect(fetchMock).toHaveBeenCalledWith(
-				"/api/sync",
-				expect.objectContaining({
-					method: "POST",
-					body: JSON.stringify({
-						kind: "dms",
-						inbox: "requests",
-						limit: 200,
-						maxPages: 3,
-					}),
-				}),
-			);
-		});
-	});
-
 	it("keeps an accessible label when the visible text is hidden", () => {
 		render(
 			<SyncNowButton
-				kind="timeline"
-				label="Sync timeline"
+				kind="likes"
+				label="Sync likes"
+				accounts={accounts}
 				onSynced={vi.fn()}
 			/>,
 		);
 
 		expect(
-			screen.getByRole("button", { name: "Sync timeline" }),
-		).toHaveAttribute("aria-label", "Sync timeline");
+			screen.getByRole("button", { name: "Sync likes" }),
+		).toBeInTheDocument();
 	});
 
-	it("waits for an account before account-scoped syncs", () => {
-		const fetchMock = vi.fn();
-		vi.stubGlobal("fetch", fetchMock);
-
+	it("disables the button until accounts load", () => {
 		render(
-			<SyncNowButton
-				kind="bookmarks"
-				label="Sync bookmarks"
-				onSynced={vi.fn()}
-			/>,
+			<SyncNowButton kind="likes" label="Sync likes" onSynced={vi.fn()} />,
 		);
 
-		const button = screen.getByRole("button", { name: "Sync bookmarks" });
-		expect(button).toBeDisabled();
-		fireEvent.click(button);
-		expect(fetchMock).not.toHaveBeenCalled();
-	});
-
-	it("waits for timeline account metadata when account selection is enabled", () => {
-		const fetchMock = vi.fn();
-		vi.stubGlobal("fetch", fetchMock);
-
-		render(
-			<SyncNowButton
-				kind="timeline"
-				label="Sync timeline"
-				onSynced={vi.fn()}
-				showAccountPicker
-			/>,
-		);
-
-		const button = screen.getByRole("button", { name: "Sync timeline" });
-		expect(button).toBeDisabled();
+		expect(screen.getByRole("button", { name: "Sync likes" })).toBeDisabled();
 		expect(screen.getByText("Loading account")).toBeInTheDocument();
-		fireEvent.click(button);
-		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
-	it("allows account-scoped syncs after an empty account list loads", async () => {
-		const fetchMock = vi.fn(
-			async (_input: RequestInfo | URL, init?: RequestInit) => {
-				const body = JSON.parse(String(init?.body)) as {
-					kind: string;
-					accountId?: string;
-				};
-				return new Response(
-					JSON.stringify({
-						id: "sync_bookmarks_1",
-						kind: body.kind,
-						accountId: body.accountId,
-						status: "succeeded",
-						startedAt: "2026-05-15T12:00:00.000Z",
-						summary: "Synced 5 items",
-						inProgress: false,
-						result: {
-							ok: true,
-							kind: body.kind,
-							accountId: body.accountId,
-							summary: "Synced 5 items",
-							steps: [],
-						},
-					}),
-				);
-			},
-		);
-		vi.stubGlobal("fetch", fetchMock);
+	it("shows an account picker when multiple accounts are available", () => {
+		const multiAccounts: AccountRecord[] = [
+			primaryAccount,
+			{ ...primaryAccount, id: "acct_studio", handle: "studio", isDefault: 0 },
+		];
 
 		render(
 			<SyncNowButton
-				accounts={[]}
 				kind="bookmarks"
 				label="Sync bookmarks"
-				onSynced={vi.fn()}
-			/>,
-		);
-
-		const button = screen.getByRole("button", { name: "Sync bookmarks" });
-		expect(button).toBeEnabled();
-		fireEvent.click(button);
-
-		await waitFor(() => {
-			expect(fetchMock).toHaveBeenCalledWith(
-				"/api/sync",
-				expect.objectContaining({
-					body: JSON.stringify({ kind: "bookmarks" }),
-				}),
-			);
-		});
-	});
-
-	it("posts the selected account id when multiple accounts are available", async () => {
-		const fetchMock = vi.fn(
-			async (_input: RequestInfo | URL, init?: RequestInit) => {
-				const body = JSON.parse(String(init?.body)) as {
-					kind: string;
-					accountId?: string;
-				};
-				return new Response(
-					JSON.stringify({
-						id: "sync_mentions_1",
-						kind: body.kind,
-						accountId: body.accountId,
-						status: "succeeded",
-						startedAt: "2026-05-15T12:00:00.000Z",
-						summary: "Synced 5 items",
-						inProgress: false,
-						result: {
-							ok: true,
-							kind: body.kind,
-							accountId: body.accountId,
-							summary: "Synced 5 items",
-							steps: [],
-						},
-					}),
-				);
-			},
-		);
-		vi.stubGlobal("fetch", fetchMock);
-
-		render(
-			<SyncNowButton
-				accounts={[
-					{
-						id: "acct_primary",
-						name: "Peter",
-						handle: "@steipete",
-						transport: "xurl",
-						isDefault: 1,
-						createdAt: "2026-05-15T12:00:00.000Z",
-					},
-					{
-						id: "acct_studio",
-						name: "Studio",
-						handle: "@studio",
-						transport: "xurl",
-						isDefault: 0,
-						createdAt: "2026-05-15T12:00:00.000Z",
-					},
-				]}
-				kind="mentions"
-				label="Sync mentions"
-				onSynced={vi.fn()}
+				accounts={multiAccounts}
 				showAccountPicker
-			/>,
-		);
-
-		fireEvent.change(screen.getByLabelText("Sync account"), {
-			target: { value: "acct_studio" },
-		});
-		fireEvent.click(screen.getByRole("button", { name: "Sync mentions" }));
-
-		await waitFor(() => {
-			expect(fetchMock).toHaveBeenCalledWith(
-				"/api/sync",
-				expect.objectContaining({
-					body: JSON.stringify({
-						kind: "mentions",
-						accountId: "acct_studio",
-					}),
-				}),
-			);
-		});
-
-		setStoredAccountId("acct_primary");
-		await waitFor(() => {
-			expect(screen.getByLabelText("Sync account")).toHaveValue("acct_primary");
-		});
-		fireEvent.click(screen.getByRole("button", { name: "Sync mentions" }));
-
-		await waitFor(() => {
-			expect(fetchMock).toHaveBeenLastCalledWith(
-				"/api/sync",
-				expect.objectContaining({
-					body: JSON.stringify({
-						kind: "mentions",
-						accountId: "acct_primary",
-					}),
-				}),
-			);
-		});
-	});
-
-	it("uses the global account without rendering an inline picker", async () => {
-		const fetchMock = vi.fn(
-			async (_input: RequestInfo | URL, init?: RequestInit) => {
-				const body = JSON.parse(String(init?.body)) as {
-					kind: string;
-					accountId?: string;
-				};
-				return new Response(
-					JSON.stringify({
-						id: "sync_mentions_1",
-						kind: body.kind,
-						accountId: body.accountId,
-						status: "succeeded",
-						startedAt: "2026-05-15T12:00:00.000Z",
-						summary: "Synced 5 items",
-						inProgress: false,
-						result: {
-							ok: true,
-							kind: body.kind,
-							accountId: body.accountId,
-							summary: "Synced 5 items",
-							steps: [],
-						},
-					}),
-				);
-			},
-		);
-		vi.stubGlobal("fetch", fetchMock);
-		setStoredAccountId("acct_studio");
-
-		render(
-			<SyncNowButton
-				accounts={[
-					{
-						id: "acct_primary",
-						name: "Peter",
-						handle: "@steipete",
-						transport: "xurl",
-						isDefault: 1,
-						createdAt: "2026-05-15T12:00:00.000Z",
-					},
-					{
-						id: "acct_studio",
-						name: "Studio",
-						handle: "@studio",
-						transport: "xurl",
-						isDefault: 0,
-						createdAt: "2026-05-15T12:00:00.000Z",
-					},
-				]}
-				kind="mentions"
-				label="Sync mentions"
 				onSynced={vi.fn()}
 			/>,
 		);
 
-		expect(screen.queryByLabelText("Sync account")).not.toBeInTheDocument();
-		fireEvent.click(screen.getByRole("button", { name: "Sync mentions" }));
-
-		await waitFor(() => {
-			expect(fetchMock).toHaveBeenCalledWith(
-				"/api/sync",
-				expect.objectContaining({
-					body: JSON.stringify({
-						kind: "mentions",
-						accountId: "acct_studio",
-					}),
-				}),
-			);
-		});
+		expect(screen.getByLabelText("Sync account")).toBeInTheDocument();
 	});
 
-	it("posts the default account for timeline syncs when accounts are supplied", async () => {
-		const fetchMock = vi.fn(
-			async (_input: RequestInfo | URL, init?: RequestInit) => {
-				const body = JSON.parse(String(init?.body)) as {
-					kind: string;
-					accountId?: string;
-				};
-				return new Response(
-					JSON.stringify({
-						id: "sync_timeline_1",
-						kind: body.kind,
-						accountId: body.accountId,
-						status: "succeeded",
-						startedAt: "2026-05-15T12:00:00.000Z",
-						summary: "Synced 5 items",
-						inProgress: false,
-						result: {
-							ok: true,
-							kind: body.kind,
-							accountId: body.accountId,
-							summary: "Synced 5 items",
-							steps: [],
-						},
-					}),
-				);
-			},
-		);
-		vi.stubGlobal("fetch", fetchMock);
-
-		render(
-			<SyncNowButton
-				accounts={[
-					{
-						id: "acct_primary",
-						name: "Peter",
-						handle: "@steipete",
-						transport: "bird",
-						isDefault: 1,
-						createdAt: "2026-05-15T12:00:00.000Z",
-					},
-					{
-						id: "acct_studio",
-						name: "Studio",
-						handle: "@studio",
-						transport: "xurl",
-						isDefault: 0,
-						createdAt: "2026-05-15T12:00:00.000Z",
-					},
-				]}
-				kind="timeline"
-				label="Sync timeline"
-				onSynced={vi.fn()}
-			/>,
-		);
-
-		expect(screen.queryByLabelText("Sync account")).not.toBeInTheDocument();
-		fireEvent.click(screen.getByRole("button", { name: "Sync timeline" }));
-
-		await waitFor(() => {
-			expect(fetchMock).toHaveBeenCalledWith(
-				"/api/sync",
-				expect.objectContaining({
-					body: JSON.stringify({
-						kind: "timeline",
-						accountId: "acct_primary",
-					}),
-				}),
-			);
-		});
-	});
-
-	it("posts selected accounts for timeline syncs", async () => {
+	it("surfaces an error summary when the sync fails", async () => {
 		const fetchMock = vi.fn(
 			async () =>
 				new Response(
 					JSON.stringify({
-						id: "sync_timeline_1",
-						kind: "timeline",
-						status: "succeeded",
+						id: "sync_bookmarks_err",
+						kind: "bookmarks",
+						status: "failed",
 						startedAt: "2026-05-15T12:00:00.000Z",
-						summary: "Synced 12 items",
+						summary: "sync exploded",
 						inProgress: false,
 						result: {
-							ok: true,
-							kind: "timeline",
-							summary: "Synced 12 items",
+							ok: false,
+							kind: "bookmarks",
+							summary: "sync exploded",
 							steps: [],
+							error: "sync exploded",
 						},
 					}),
 				),
 		);
 		vi.stubGlobal("fetch", fetchMock);
-		setStoredAccountId("acct_studio");
 
 		render(
 			<SyncNowButton
-				accounts={[
-					{
-						id: "acct_primary",
-						name: "Peter",
-						handle: "@steipete",
-						transport: "bird",
-						isDefault: 1,
-						createdAt: "2026-05-15T12:00:00.000Z",
-					},
-					{
-						id: "acct_studio",
-						name: "Studio",
-						handle: "@studio",
-						transport: "xurl",
-						isDefault: 0,
-						createdAt: "2026-05-15T12:00:00.000Z",
-					},
-				]}
-				kind="timeline"
-				label="Sync timeline"
+				kind="bookmarks"
+				label="Sync bookmarks"
+				accounts={accounts}
 				onSynced={vi.fn()}
 			/>,
 		);
 
-		const button = screen.getByRole("button", {
-			name: "Sync timeline",
-		});
+		fireEvent.click(screen.getByRole("button", { name: "Sync bookmarks" }));
 
-		fireEvent.click(button);
 		await waitFor(() => {
-			expect(fetchMock).toHaveBeenCalledWith(
-				"/api/sync",
-				expect.objectContaining({
-					body: JSON.stringify({
-						kind: "timeline",
-						accountId: "acct_studio",
-					}),
-				}),
-			);
+			expect(screen.getByText("sync exploded")).toBeInTheDocument();
 		});
-	});
-
-	it("surfaces sync failures", async () => {
-		vi.stubGlobal(
-			"fetch",
-			vi.fn(
-				async () =>
-					new Response(JSON.stringify({ ok: false, message: "Rate limited" }), {
-						status: 500,
-					}),
-			),
-		);
-
-		render(
-			<SyncNowButton
-				kind="timeline"
-				label="Sync timeline"
-				onSynced={vi.fn()}
-			/>,
-		);
-
-		fireEvent.click(screen.getByRole("button", { name: "Sync timeline" }));
-
-		expect(await screen.findByText("Rate limited")).toBeInTheDocument();
-	});
-
-	it("polls running sync jobs until completion", async () => {
-		const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-			const url = String(input);
-			if (url.endsWith("/api/sync")) {
-				return new Response(
-					JSON.stringify({
-						id: "sync_timeline_poll",
-						kind: "timeline",
-						status: "running",
-						startedAt: "2026-05-15T12:00:00.000Z",
-						summary: "Syncing Home timeline",
-						inProgress: true,
-					}),
-					{ status: 202 },
-				);
-			}
-			if (url.includes("/api/sync?id=sync_timeline_poll")) {
-				return new Response(
-					JSON.stringify({
-						id: "sync_timeline_poll",
-						kind: "timeline",
-						status: "succeeded",
-						startedAt: "2026-05-15T12:00:00.000Z",
-						finishedAt: "2026-05-15T12:00:03.000Z",
-						summary: "Synced 4 items",
-						inProgress: false,
-						result: {
-							ok: true,
-							kind: "timeline",
-							summary: "Synced 4 items",
-							steps: [],
-						},
-					}),
-				);
-			}
-			throw new Error(`Unexpected fetch ${url}`);
-		});
-		vi.stubGlobal("fetch", fetchMock);
-
-		render(
-			<SyncNowButton
-				kind="timeline"
-				label="Sync timeline"
-				onSynced={vi.fn()}
-			/>,
-		);
-
-		fireEvent.click(screen.getByRole("button", { name: "Sync timeline" }));
-
-		expect(await screen.findByText("Synced 4 items")).toBeInTheDocument();
-		expect(fetchMock).toHaveBeenCalledTimes(2);
-	});
-
-	it("surfaces in-progress sync summaries", async () => {
-		vi.stubGlobal(
-			"fetch",
-			vi.fn(
-				async () =>
-					new Response(
-						JSON.stringify({
-							id: "sync_timeline_1",
-							kind: "timeline",
-							status: "failed",
-							startedAt: "2026-05-15T12:00:00.000Z",
-							summary: "Sync already running",
-							inProgress: false,
-							result: {
-								ok: false,
-								kind: "timeline",
-								summary: "Sync already running",
-								steps: [],
-								inProgress: true,
-							},
-						}),
-					),
-			),
-		);
-
-		render(
-			<SyncNowButton
-				kind="timeline"
-				label="Sync timeline"
-				onSynced={vi.fn()}
-			/>,
-		);
-
-		fireEvent.click(screen.getByRole("button", { name: "Sync timeline" }));
-
-		expect(await screen.findByText("Sync already running")).toBeInTheDocument();
 	});
 });

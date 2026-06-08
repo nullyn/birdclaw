@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 	listBookmarkedTweetsViaXurl: vi.fn(),
 	listLikedTweetsViaXurl: vi.fn(),
 	lookupUsersByHandles: vi.fn(),
+	lookupTweetsByIds: vi.fn(),
 }));
 
 vi.mock("./bird", () => ({
@@ -42,6 +43,14 @@ vi.mock("./xurl", () => ({
 	listBookmarkedTweetsViaXurl: mocks.listBookmarkedTweetsViaXurl,
 	listLikedTweetsViaXurl: mocks.listLikedTweetsViaXurl,
 	lookupUsersByHandles: mocks.lookupUsersByHandles,
+}));
+
+vi.mock("./tweet-lookup", () => ({
+	lookupTweetsByIdsEffect: (ids: string[], mode?: unknown) =>
+		Effect.tryPromise({
+			try: () => mocks.lookupTweetsByIds(ids, mode),
+			catch: (error) => error,
+		}),
 }));
 
 const tempRoots: string[] = [];
@@ -914,109 +923,363 @@ describe("live timeline collection sync", () => {
 		expect(mocks.listLikedTweetsViaBird).not.toHaveBeenCalled();
 	});
 
-	it("syncs the bird following timeline into the local home feed", async () => {
+	it("indexes the quoted parent of a bookmark as a searchable reference", async () => {
 		setupTempHome();
-		mocks.listHomeTimelineViaBird.mockResolvedValue({
+		mocks.listBookmarkedTweetsViaXurl.mockResolvedValue({
 			data: [
 				{
-					id: "home_1",
-					author_id: "44",
-					text: "bird home item",
-					created_at: "2026-05-04T07:19:34.000Z",
-					public_metrics: { like_count: 15 },
+					id: "bookmark_quote",
+					author_id: "42",
+					text: "look at this",
+					created_at: "2026-04-26T13:43:34.000Z",
+					public_metrics: { like_count: 3 },
+					referenced_tweets: [{ type: "quoted", id: "parent_quote" }],
 				},
 			],
 			includes: {
-				users: [{ id: "44", username: "jules", name: "Jules" }],
+				users: [
+					{ id: "42", username: "sam", name: "Sam" },
+					{ id: "77", username: "guru", name: "Guru" },
+				],
+				tweets: [
+					{
+						id: "parent_quote",
+						author_id: "77",
+						text: "the original AI insight worth saving",
+						created_at: "2026-04-20T10:00:00.000Z",
+						public_metrics: { like_count: 999 },
+					},
+				],
 			},
 			meta: { result_count: 1 },
 		});
-		const { syncHomeTimeline } = await import("./timeline-live");
+		const { syncTimelineCollection } =
+			await import("./timeline-collections-live");
 
-		const result = await syncHomeTimeline({
-			limit: 25,
+		await syncTimelineCollection({
+			kind: "bookmarks",
+			mode: "xurl",
+			limit: 5,
 			refresh: true,
 		});
-		const home = listTimelineItems({ resource: "home" });
-		const syncedHomeItem = home.find((item) => item.id === "home_1");
+		const db = getNativeDb();
+		const parent = db
+			.prepare(
+				"select kind, author_profile_id, bookmarked, liked from tweets where id = ?",
+			)
+			.get("parent_quote");
+		const ftsCount = db
+			.prepare("select count(*) as count from tweets_fts where tweet_id = ?")
+			.get("parent_quote") as { count: number };
+		const collectionCount = db
+			.prepare(
+				"select count(*) as count from tweet_collections where tweet_id = ?",
+			)
+			.get("parent_quote") as { count: number };
+		const bookmark = db
+			.prepare("select quoted_tweet_id from tweets where id = ?")
+			.get("bookmark_quote");
 
-		expect(result).toMatchObject({
-			ok: true,
-			source: "bird",
-			feed: "following",
-			count: 1,
+		expect(parent).toMatchObject({
+			kind: "reference",
+			author_profile_id: "profile_user_77",
+			bookmarked: 0,
+			liked: 0,
 		});
-		expect(mocks.listHomeTimelineViaBird).toHaveBeenCalledWith({
-			maxResults: 25,
-			following: true,
-		});
-		expect(syncedHomeItem).toMatchObject({
-			kind: "home",
-			liked: false,
-			bookmarked: false,
-			author: { handle: "jules" },
-		});
+		expect(ftsCount.count).toBe(1);
+		expect(collectionCount.count).toBe(0);
+		expect(bookmark).toMatchObject({ quoted_tweet_id: "parent_quote" });
 	});
 
-	it("caches bird home timeline payloads by feed", async () => {
+	it("indexes the retweeted parent of a bookmark", async () => {
 		setupTempHome();
-		mocks.listHomeTimelineViaBird.mockResolvedValue({
+		mocks.listBookmarkedTweetsViaXurl.mockResolvedValue({
 			data: [
 				{
-					id: "home_cached_1",
-					author_id: "45",
-					text: "bird for you item",
-					created_at: "2026-05-04T07:19:34.000Z",
-					entities: {
-						urls: [{ media_key: "media_1" }, { media_key: 17 }, undefined],
-					},
+					id: "bookmark_rt",
+					author_id: "42",
+					text: "RT @guru: the original AI insight",
+					created_at: "2026-04-26T13:43:34.000Z",
+					referenced_tweets: [{ type: "retweeted", id: "parent_rt" }],
 				},
 			],
+			includes: {
+				users: [
+					{ id: "42", username: "sam", name: "Sam" },
+					{ id: "77", username: "guru", name: "Guru" },
+				],
+				tweets: [
+					{
+						id: "parent_rt",
+						author_id: "77",
+						text: "the original AI insight",
+						created_at: "2026-04-20T10:00:00.000Z",
+					},
+				],
+			},
 			meta: { result_count: 1 },
 		});
-		const { syncHomeTimeline } = await import("./timeline-live");
+		const { syncTimelineCollection } =
+			await import("./timeline-collections-live");
 
-		const fresh = await syncHomeTimeline({
-			limit: 25,
-			following: false,
+		await syncTimelineCollection({
+			kind: "bookmarks",
+			mode: "xurl",
+			limit: 5,
 			refresh: true,
-			cacheTtlMs: 10_000,
 		});
-		const cached = await syncHomeTimeline({
-			limit: 25,
-			following: false,
-			cacheTtlMs: 10_000,
-		});
-		const row = getNativeDb()
-			.prepare("select media_count, author_profile_id from tweets where id = ?")
-			.get("home_cached_1");
+		const parent = getNativeDb()
+			.prepare("select kind, author_profile_id from tweets where id = ?")
+			.get("parent_rt");
 
-		expect(fresh).toMatchObject({ source: "bird", feed: "for-you" });
-		expect(cached).toMatchObject({ source: "cache", feed: "for-you" });
-		expect(mocks.listHomeTimelineViaBird).toHaveBeenCalledTimes(1);
-		expect(mocks.listHomeTimelineViaBird).toHaveBeenCalledWith({
-			maxResults: 25,
-			following: false,
-		});
-		expect(row).toMatchObject({
-			media_count: 1,
-			author_profile_id: "profile_user_45",
+		expect(parent).toMatchObject({
+			kind: "reference",
+			author_profile_id: "profile_user_77",
 		});
 	});
 
-	it("validates home timeline options before fetching", async () => {
+	it("does not index the replied-to parent of a mid-thread bookmark", async () => {
 		setupTempHome();
-		const { syncHomeTimeline } = await import("./timeline-live");
+		mocks.listBookmarkedTweetsViaXurl.mockResolvedValue({
+			data: [
+				{
+					id: "bookmark_reply",
+					author_id: "42",
+					text: "great point",
+					created_at: "2026-04-26T13:43:34.000Z",
+					referenced_tweets: [{ type: "replied_to", id: "thread_root" }],
+				},
+			],
+			includes: {
+				users: [{ id: "42", username: "sam", name: "Sam" }],
+				tweets: [
+					{
+						id: "thread_root",
+						author_id: "42",
+						text: "the thread starts here",
+						created_at: "2026-04-20T10:00:00.000Z",
+					},
+				],
+			},
+			meta: { result_count: 1 },
+		});
+		const { syncTimelineCollection } =
+			await import("./timeline-collections-live");
 
-		await expect(syncHomeTimeline({ limit: 0 })).rejects.toThrow(
-			"--limit must be at least 1",
+		await syncTimelineCollection({
+			kind: "bookmarks",
+			mode: "xurl",
+			limit: 5,
+			refresh: true,
+		});
+		const parent = getNativeDb()
+			.prepare("select id from tweets where id = ?")
+			.get("thread_root");
+
+		expect(parent).toBeUndefined();
+	});
+
+	it("does not index parents for likes", async () => {
+		setupTempHome();
+		mocks.listLikedTweetsViaXurl.mockResolvedValue({
+			data: [
+				{
+					id: "liked_quote",
+					author_id: "42",
+					text: "saved a quote",
+					created_at: "2026-04-26T13:43:34.000Z",
+					referenced_tweets: [{ type: "quoted", id: "parent_for_like" }],
+				},
+			],
+			includes: {
+				users: [{ id: "42", username: "sam", name: "Sam" }],
+				tweets: [
+					{
+						id: "parent_for_like",
+						author_id: "77",
+						text: "should not be indexed",
+						created_at: "2026-04-20T10:00:00.000Z",
+					},
+				],
+			},
+			meta: { result_count: 1 },
+		});
+		const { syncTimelineCollection } =
+			await import("./timeline-collections-live");
+
+		await syncTimelineCollection({
+			kind: "likes",
+			mode: "xurl",
+			limit: 5,
+			refresh: true,
+		});
+		const parent = getNativeDb()
+			.prepare("select id from tweets where id = ?")
+			.get("parent_for_like");
+
+		expect(parent).toBeUndefined();
+	});
+
+	function insertExistingBookmark({
+		bookmarkId,
+		parentId,
+		referenceType,
+		quotedColumn,
+	}: {
+		bookmarkId: string;
+		parentId: string;
+		referenceType: "quoted" | "retweeted";
+		quotedColumn: string | null;
+	}) {
+		const db = getNativeDb();
+		db.prepare(
+			`
+        insert into tweets (
+          id, account_id, author_profile_id, kind, text, created_at,
+          is_replied, reply_to_id, like_count, media_count, bookmarked, liked,
+          entities_json, media_json, quoted_tweet_id
+        ) values (?, 'acct_primary', 'profile_user_42', 'bookmark', ?, ?, 0, null, 0, 0, 1, 0, '{}', '[]', ?)
+        `,
+		).run(
+			bookmarkId,
+			"saved earlier",
+			"2026-03-01T00:00:00.000Z",
+			quotedColumn,
 		);
-		await expect(syncHomeTimeline({ account: "missing" })).rejects.toThrow(
-			"Unknown account: missing",
+		db.prepare(
+			`
+        insert into tweet_collections (
+          account_id, tweet_id, kind, collected_at, source, raw_json, updated_at
+        ) values ('acct_primary', ?, 'bookmarks', null, 'archive', ?, '2026-03-01T00:00:00.000Z')
+        `,
+		).run(
+			bookmarkId,
+			JSON.stringify({
+				id: bookmarkId,
+				referenced_tweets: [{ type: referenceType, id: parentId }],
+			}),
 		);
-		getNativeDb().prepare("delete from accounts").run();
-		await expect(syncHomeTimeline({})).rejects.toThrow(
-			"Unknown account: default",
+	}
+
+	it("backfills the missing quoted parent of an existing bookmark", async () => {
+		setupTempHome();
+		insertExistingBookmark({
+			bookmarkId: "old_bookmark",
+			parentId: "old_parent",
+			referenceType: "quoted",
+			quotedColumn: "old_parent",
+		});
+		mocks.lookupTweetsByIds.mockResolvedValue({
+			data: [
+				{
+					id: "old_parent",
+					author_id: "77",
+					text: "the indexed parent worth saving",
+					created_at: "2026-02-01T00:00:00.000Z",
+				},
+			],
+			includes: { users: [{ id: "77", username: "guru", name: "Guru" }] },
+		});
+		const { backfillBookmarkReferenceParents } =
+			await import("./timeline-collections-live");
+
+		const result = await backfillBookmarkReferenceParents({ mode: "xurl" });
+		const db = getNativeDb();
+		const parent = db
+			.prepare("select kind, author_profile_id from tweets where id = ?")
+			.get("old_parent");
+		const ftsCount = db
+			.prepare("select count(*) as count from tweets_fts where tweet_id = ?")
+			.get("old_parent") as { count: number };
+		const collectionCount = db
+			.prepare(
+				"select count(*) as count from tweet_collections where tweet_id = ?",
+			)
+			.get("old_parent") as { count: number };
+
+		expect(result).toMatchObject({
+			missingParents: 1,
+			fetched: 1,
+			persisted: 1,
+		});
+		expect(mocks.lookupTweetsByIds).toHaveBeenCalledWith(
+			["old_parent"],
+			"xurl",
 		);
+		expect(parent).toMatchObject({
+			kind: "reference",
+			author_profile_id: "profile_user_77",
+		});
+		expect(ftsCount.count).toBe(1);
+		expect(collectionCount.count).toBe(0);
+	});
+
+	it("backfills retweeted parents whose ids live only in raw_json", async () => {
+		setupTempHome();
+		insertExistingBookmark({
+			bookmarkId: "old_rt_bookmark",
+			parentId: "old_rt_parent",
+			referenceType: "retweeted",
+			quotedColumn: null,
+		});
+		mocks.lookupTweetsByIds.mockResolvedValue({
+			data: [
+				{
+					id: "old_rt_parent",
+					author_id: "77",
+					text: "retweeted original",
+					created_at: "2026-02-01T00:00:00.000Z",
+				},
+			],
+			includes: { users: [{ id: "77", username: "guru", name: "Guru" }] },
+		});
+		const { backfillBookmarkReferenceParents } =
+			await import("./timeline-collections-live");
+
+		const result = await backfillBookmarkReferenceParents({ mode: "xurl" });
+		const parent = getNativeDb()
+			.prepare("select kind from tweets where id = ?")
+			.get("old_rt_parent");
+
+		expect(result).toMatchObject({ missingParents: 1, persisted: 1 });
+		expect(mocks.lookupTweetsByIds).toHaveBeenCalledWith(
+			["old_rt_parent"],
+			"xurl",
+		);
+		expect(parent).toMatchObject({ kind: "reference" });
+	});
+
+	it("is idempotent and skips parents that already exist", async () => {
+		setupTempHome();
+		insertExistingBookmark({
+			bookmarkId: "old_bookmark",
+			parentId: "old_parent",
+			referenceType: "quoted",
+			quotedColumn: "old_parent",
+		});
+		mocks.lookupTweetsByIds.mockResolvedValue({
+			data: [
+				{
+					id: "old_parent",
+					author_id: "77",
+					text: "the indexed parent",
+					created_at: "2026-02-01T00:00:00.000Z",
+				},
+			],
+			includes: { users: [{ id: "77", username: "guru", name: "Guru" }] },
+		});
+		const { backfillBookmarkReferenceParents } =
+			await import("./timeline-collections-live");
+
+		await backfillBookmarkReferenceParents({ mode: "xurl" });
+		mocks.lookupTweetsByIds.mockClear();
+		const second = await backfillBookmarkReferenceParents({ mode: "xurl" });
+
+		expect(second).toMatchObject({
+			missingParents: 0,
+			fetched: 0,
+			persisted: 0,
+		});
+		expect(mocks.lookupTweetsByIds).not.toHaveBeenCalled();
 	});
 });

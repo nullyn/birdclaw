@@ -17,6 +17,7 @@ const RICH_USER_FIELDS =
 const FOLLOW_USER_FIELDS =
 	"id%2Cusername%2Cname%2Cdescription%2Cverified%2Cprotected%2Cpublic_metrics%2Cprofile_image_url%2Ccreated_at";
 const AUTHOR_MEDIA_EXPANSIONS = "author_id%2Cattachments.media_keys";
+const BOOKMARK_EXPANSIONS = `${AUTHOR_MEDIA_EXPANSIONS}%2Creferenced_tweets.id%2Creferenced_tweets.id.author_id`;
 const MEDIA_EXPANSION = "attachments.media_keys";
 const MEDIA_FIELDS =
 	"variants%2Cpreview_image_url%2Curl%2Cduration_ms%2Calt_text%2Ctype%2Cwidth%2Cheight%2Cpublic_metrics";
@@ -1216,7 +1217,7 @@ describe("xurl transport wrapper", () => {
 		expect(execFileAsyncMock).toHaveBeenCalledWith("xurl", [
 			"--auth",
 			"oauth2",
-			`/2/users/25401953/bookmarks?max_results=100&expansions=${AUTHOR_MEDIA_EXPANSIONS}&tweet.fields=created_at%2Cconversation_id%2Centities%2Cpublic_metrics%2Creferenced_tweets&media.fields=${MEDIA_FIELDS}&user.fields=${RICH_USER_FIELDS}&pagination_token=next`,
+			`/2/users/25401953/bookmarks?max_results=100&expansions=${BOOKMARK_EXPANSIONS}&tweet.fields=created_at%2Cconversation_id%2Centities%2Cpublic_metrics%2Creferenced_tweets&media.fields=${MEDIA_FIELDS}&user.fields=${RICH_USER_FIELDS}&pagination_token=next`,
 		]);
 	});
 
@@ -1254,12 +1255,12 @@ describe("xurl transport wrapper", () => {
 		expect(execFileAsyncMock).toHaveBeenNthCalledWith(1, "xurl", [
 			"--auth",
 			"oauth2",
-			`/2/users/25401953/bookmarks?max_results=90&expansions=${AUTHOR_MEDIA_EXPANSIONS}&tweet.fields=created_at%2Cconversation_id%2Centities%2Cpublic_metrics%2Creferenced_tweets&media.fields=${MEDIA_FIELDS}&user.fields=${RICH_USER_FIELDS}`,
+			`/2/users/25401953/bookmarks?max_results=90&expansions=${BOOKMARK_EXPANSIONS}&tweet.fields=created_at%2Cconversation_id%2Centities%2Cpublic_metrics%2Creferenced_tweets&media.fields=${MEDIA_FIELDS}&user.fields=${RICH_USER_FIELDS}`,
 		]);
 		expect(execFileAsyncMock).toHaveBeenNthCalledWith(2, "xurl", [
 			"--auth",
 			"oauth2",
-			`/2/users/25401953/bookmarks?max_results=100&expansions=${AUTHOR_MEDIA_EXPANSIONS}&tweet.fields=created_at%2Cconversation_id%2Centities%2Cpublic_metrics%2Creferenced_tweets&media.fields=${MEDIA_FIELDS}&user.fields=${RICH_USER_FIELDS}`,
+			`/2/users/25401953/bookmarks?max_results=100&expansions=${BOOKMARK_EXPANSIONS}&tweet.fields=created_at%2Cconversation_id%2Centities%2Cpublic_metrics%2Creferenced_tweets&media.fields=${MEDIA_FIELDS}&user.fields=${RICH_USER_FIELDS}`,
 		]);
 		expect(execFileAsyncMock).toHaveBeenNthCalledWith(3, "xurl", [
 			"--auth",

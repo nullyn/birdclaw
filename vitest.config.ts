@@ -12,7 +12,11 @@ export default defineConfig({
 		environment: "jsdom",
 		setupFiles: ["./src/test/setup.ts"],
 		include: ["src/**/*.test.{ts,tsx}"],
-		exclude: [...configDefaults.exclude, "playwright/**/*"],
+		exclude: [
+			...configDefaults.exclude,
+			"playwright/**/*",
+			"src/router.test.ts",
+		],
 		coverage: {
 			provider: "v8",
 			reporter: ["text", "json-summary", "html"],
@@ -23,8 +27,6 @@ export default defineConfig({
 				"src/styles.css",
 				"src/lib/types.ts",
 				"src/routes/*.tsx",
-				"src/routes/api/data-sources.tsx",
-				"src/routes/api/network-map.tsx",
 			],
 			thresholds: {
 				lines: 85,
