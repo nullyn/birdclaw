@@ -4,7 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { maybeAutoSyncBackup, type BackupAutoUpdateResult } from "./backup";
-import { ensureBirdclawDirs, getBirdclawPaths } from "./config";
+import {
+	ensureBirdclawDirs,
+	getBirdclawPaths,
+	getBirdclawConfig,
+} from "./config";
 import { getNativeDb } from "./db";
 import { syncDirectMessagesViaCachedBird } from "./dms-live";
 import { syncMentionThreads } from "./mention-threads-live";
@@ -37,7 +41,7 @@ export type AccountSyncStepKind =
 export interface AccountSyncJobOptions {
 	account?: string;
 	steps?: AccountSyncStepKind[];
-	mode?: TimelineCollectionMode;
+	mode?: Exclude<TimelineCollectionMode, "playwright">;
 	limit?: number;
 	maxPages?: number;
 	refresh?: boolean;
@@ -86,7 +90,7 @@ export interface AccountSyncLaunchAgentOptions {
 	program?: string;
 	account?: string;
 	steps?: AccountSyncStepKind[];
-	mode?: TimelineCollectionMode;
+	mode?: Exclude<TimelineCollectionMode, "playwright">;
 	limit?: number;
 	maxPages?: number;
 	refresh?: boolean;
@@ -337,10 +341,10 @@ async function runStep({
 		}
 
 		const collectionKind = kind as TimelineCollectionKind;
-		const collectionMode = resolveCollectionModeForAccount({
-			mode,
-			allowBirdAccount,
-		});
+		const collectionMode =
+			collectionKind === "bookmarks" && mode === "auto"
+				? (getBirdclawConfig().bookmarks?.mode ?? "playwright")
+				: resolveCollectionModeForAccount({ mode, allowBirdAccount });
 		if (!collectionMode) {
 			return { kind, ok: false, count: 0, error: birdAccountError(kind) };
 		}

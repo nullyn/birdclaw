@@ -29,6 +29,7 @@ import {
 } from "./backup";
 import { resetBirdclawPathsForTests } from "./config";
 import { getNativeDb, resetDatabaseForTests } from "./db";
+import { getSavedResource, upsertSavedResource } from "./saved-resources";
 
 const tempDirs: string[] = [];
 
@@ -316,6 +317,87 @@ describe("text backup", () => {
 		expect(imported.ok).toBe(true);
 		expect(imported.mode).toBe("replace");
 	}, 20000);
+
+	it("round-trips source-neutral saved resources", async () => {
+		process.env.BIRDCLAW_HOME = makeTempDir("birdclaw-backup-resources-src-");
+		await upsertSavedResource({
+			source: "github",
+			account: "octo",
+			externalId: "repo-1",
+			url: "https://github.com/octo/project",
+			title: "octo/project",
+			author: "octo",
+			text: "A useful tool Topics: search README content",
+			savedAt: "2025-01-01T00:00:00Z",
+			fetchedAt: "2025-01-02T00:00:00Z",
+			metadata: { topics: ["search"] },
+			contentHash: "hash-1",
+		});
+		const repoPath = makeTempDir("birdclaw-backup-resources-store-");
+		await exportBackup({ repoPath });
+
+		resetDatabaseForTests();
+		resetBirdclawPathsForTests();
+		process.env.BIRDCLAW_HOME = makeTempDir("birdclaw-backup-resources-dst-");
+		await importBackup({ repoPath, mode: "replace" });
+		expect(await getSavedResource("github", "octo", "repo-1")).toMatchObject({
+			text: "A useful tool Topics: search README content",
+			metadata: { topics: ["search"] },
+		});
+	});
+
+	it.each(["github", "instagram"])(
+		"merges %s resources by fetch time without reverting fresh captures",
+		async (source) => {
+			process.env.BIRDCLAW_HOME = makeTempDir("nalanda-backup-resource-merge-");
+			const repoPath = makeTempDir("nalanda-backup-resource-merge-store-");
+			const resource = {
+				source,
+				account: "octo",
+				externalId: "repo-1",
+				url: "https://github.com/octo/project",
+				title: "octo/project",
+				author: "octo",
+				text: "Old README",
+				savedAt: "2025-01-01T00:00:00Z",
+				fetchedAt: "2025-01-02T00:00:00Z",
+				metadata: { pushedAt: "old" },
+				contentHash: "old",
+			};
+			await upsertSavedResource(resource);
+			await exportBackup({ repoPath });
+			const fresh = {
+				...resource,
+				text: "Fresh README",
+				fetchedAt: "2025-01-02T00:00:00.001Z",
+				metadata: { pushedAt: "new" },
+				contentHash: "new",
+			};
+			await upsertSavedResource(fresh);
+			await importBackup({ repoPath, mode: "merge" });
+			expect(await getSavedResource(source, "octo", "repo-1")).toMatchObject(
+				fresh,
+			);
+
+			await exportBackup({ repoPath });
+			await upsertSavedResource(resource);
+			await importBackup({ repoPath, mode: "merge" });
+			expect(await getSavedResource(source, "octo", "repo-1")).toMatchObject(
+				fresh,
+			);
+
+			await upsertSavedResource({
+				...fresh,
+				text: "Equal-time local capture",
+				contentHash: "equal",
+			});
+			await importBackup({ repoPath, mode: "merge" });
+			expect(await getSavedResource(source, "octo", "repo-1")).toMatchObject({
+				text: "Equal-time local capture",
+				contentHash: "equal",
+			});
+		},
+	);
 
 	it("rejects backup export paths that traverse symlinked managed directories", async () => {
 		process.env.BIRDCLAW_HOME = makeTempDir("birdclaw-backup-symlink-src-");

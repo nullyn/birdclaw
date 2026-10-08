@@ -21,6 +21,14 @@ const CHUNKER_VERSION = "knowledge-passages-v1";
 const MAX_PASSAGE_LENGTH = 1600;
 const PASSAGE_OVERLAP = 200;
 
+function splitsSurrogatePair(text: string, offset: number) {
+	const before = text.charCodeAt(offset - 1);
+	const after = text.charCodeAt(offset);
+	return (
+		before >= 0xd800 && before <= 0xdbff && after >= 0xdc00 && after <= 0xdfff
+	);
+}
+
 function nullableString(value: unknown): string | null {
 	return typeof value === "string" && value.length > 0 ? value : null;
 }
@@ -107,6 +115,20 @@ export function loadKnowledgeDocuments(): KnowledgeDocument[] {
 				: (nullableString(metadata.savedAtSource) ??
 					(row.saved_at ? "saved_resources.saved_at" : null));
 		const publishedAt = nullableString(metadata.publishedAt);
+		const text = String(row.text);
+		const links =
+			source === "instagram" && Array.isArray(metadata.authorLinks)
+				? [
+						...new Set(
+							metadata.authorLinks.filter(
+								(link): link is string =>
+									typeof link === "string" &&
+									/^https?:\/\//.test(link) &&
+									!text.includes(link),
+							),
+						),
+					]
+				: [];
 		documents.push({
 			id: documentId(source, account, externalId),
 			source,
@@ -115,7 +137,9 @@ export function loadKnowledgeDocuments(): KnowledgeDocument[] {
 			url: String(row.url),
 			title: String(row.title),
 			author: String(row.author),
-			text: String(row.text),
+			text: [text, links.length ? `Author links: ${links.join("\n")}` : ""]
+				.filter(Boolean)
+				.join("\n\n"),
 			publishedAt,
 			publishedAtSource: publishedAt
 				? nullableString(metadata.publishedAtSource)
@@ -146,9 +170,12 @@ export function splitKnowledgePassages(
 			if (preferred > start + Math.floor(MAX_PASSAGE_LENGTH / 2))
 				end = preferred;
 		}
+		if (splitsSurrogatePair(text, end)) end -= 1;
 		passages.push({ text: text.slice(start, end), start, end });
 		if (end === text.length) break;
-		const nextStart = Math.max(start + 1, end - PASSAGE_OVERLAP);
+		let nextStart = Math.max(start + 1, end - PASSAGE_OVERLAP);
+		if (splitsSurrogatePair(text, nextStart)) nextStart -= 1;
+		if (nextStart <= start) nextStart = start + 2;
 		start = nextStart;
 	}
 	return passages;

@@ -5,6 +5,12 @@ import { dirname } from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Command } from "commander";
+import { analyzeBookmarks } from "#/lib/bookmark-intelligence";
+import { getNativeDb } from "#/lib/db";
+import { syncGithubStars } from "#/lib/github-stars";
+import { syncInstagramCollection } from "#/lib/instagram-saved";
+import { getSavedResource, searchSavedResources } from "#/lib/saved-resources";
+import { indexKnowledge, searchKnowledge } from "#/lib/knowledge-search";
 import { registerModerationCommands } from "#/cli-moderation";
 import { findArchives } from "#/lib/archive-finder";
 import {
@@ -736,14 +742,14 @@ async function autoSyncAfterWrite() {
 }
 
 program
-	.name("birdclaw")
-	.description("Local-first Twitter workspace")
+	.name("nalanda")
+	.description("Local saved knowledge for agents")
 	.version(packageVersion.version ?? "0.0.0")
 	.option("--json", "Emit JSON output");
 
 program
 	.command("init")
-	.description("Create local birdclaw root and seed the database")
+	.description("Create local Nalanda root and seed the database")
 	.action(async () => {
 		const paths = ensureBirdclawDirs();
 		await getQueryEnvelope();
@@ -838,6 +844,115 @@ importCommand
 const searchCommand = program
 	.command("search")
 	.description("Search local data");
+
+program
+	.command("index")
+	.description("Build local search indexes")
+	.command("knowledge")
+	.description(
+		"Incrementally embed saved X, Instagram, and GitHub content using local Ollama",
+	)
+	.action(async () => {
+		const result = await indexKnowledge({
+			onProgress: ({ completed, total, embeddedPassages }) => {
+				if (completed % 100 === 0 || completed === total)
+					process.stderr.write(
+						`Indexed ${completed}/${total} documents; ${embeddedPassages} new passages\n`,
+					);
+			},
+		});
+		print(result, program.opts().json ?? false);
+	});
+
+searchCommand
+	.command("knowledge <query>")
+	.description(
+		"Search all saved sources with local semantic recall and cached JEV reranking",
+	)
+	.option("--source <source>", "x, github, or instagram (default all)")
+	.option("--account <account>", "Exact source account ID/username")
+	.option("--limit <n>", "Return 1–50 evidence passages", "10")
+	.option("--mode <mode>", "hybrid, semantic, or keyword", "hybrid")
+	.option("--no-rerank", "Use local retrieval only, without JEV requests")
+	.option("--refresh-index", "Index changed local content before searching")
+	.action(async (query, options) => {
+		if (
+			options.source &&
+			!["x", "github", "instagram"].includes(options.source)
+		)
+			throw new Error("--source must be x, github, or instagram");
+		if (!["hybrid", "semantic", "keyword"].includes(options.mode))
+			throw new Error("--mode must be hybrid, semantic, or keyword");
+		const limit = parsePositiveIntegerOption(options.limit, "--limit");
+		if (limit === undefined) return;
+		if (limit > 50) throw new Error("Search limit must be between 1 and 50");
+		if (!query.trim() || query.trim().length > 1000)
+			throw new Error("Search query must contain 1–1000 characters");
+		if (options.refreshIndex) await indexKnowledge();
+		print(
+			await searchKnowledge({
+				query,
+				source: options.source,
+				account: options.account,
+				limit,
+				mode: options.mode,
+				rerank: options.rerank,
+			}),
+			program.opts().json ?? false,
+		);
+	});
+
+searchCommand
+	.command("saved <query>")
+	.description("Search imported GitHub and Instagram text locally with FTS5")
+	.option("--source <source>", "github or instagram (default both)")
+	.option("--account <username>", "Source account username")
+	.option("--limit <n>", "Limit results", "20")
+	.action(async (query, options) => {
+		if (options.source && !["github", "instagram"].includes(options.source))
+			throw new Error("--source must be github or instagram");
+		const limit = parsePositiveIntegerOption(options.limit, "--limit");
+		if (limit === undefined) return;
+		const items = await searchSavedResources({
+			query,
+			source: options.source,
+			account: options.account,
+			limit,
+		});
+		print(
+			items.map((item) => ({
+				source: item.source,
+				account: item.account,
+				externalId: item.externalId,
+				url: item.url,
+				title: item.title,
+				author: item.author,
+				excerpt: item.excerpt,
+				savedAt: item.savedAt,
+				savedAtSource:
+					typeof item.metadata.savedAtSource === "string"
+						? item.metadata.savedAtSource
+						: item.source === "github"
+							? "starred-at"
+							: "saved_resources.saved_at",
+				publishedAt: item.metadata.publishedAt || null,
+				publishedAtSource: item.metadata.publishedAtSource || null,
+				fetchedAt: item.fetchedAt,
+			})),
+			program.opts().json ?? false,
+		);
+	});
+
+program
+	.command("saved-get <source> <account> <id>")
+	.description("Read a complete saved GitHub or Instagram record")
+	.action(async (source, account, id) => {
+		if (!["github", "instagram"].includes(source))
+			throw new Error("source must be github or instagram");
+		const item = await getSavedResource(source, account, id);
+		if (!item) throw new Error("Saved resource not found");
+		print(item, program.opts().json ?? false);
+	});
 
 searchCommand
 	.command("tweets [query]")
@@ -1013,6 +1128,95 @@ searchCommand
 			return;
 		}
 		console.log(formatLinkSearchItems(items));
+	});
+
+program
+	.command("bookmarks-analyze [query]")
+	.description("Tag local bookmarks with JEV and rank them against a question")
+	.option("--account <accountId>", "Account id")
+	.option("--limit <n>", "Analyze at most 50 local bookmarks", "20")
+	.option("--cached-only", "Read cached judgments without calling JEV")
+	.option(
+		"--all",
+		"Tag every local bookmark in resumable batches (no ranking query)",
+	)
+	.option("--search <terms>", "Keyword filter before analysis or ranking")
+	.action(async (query, options) => {
+		const limit = Number(options.limit);
+		if (!Number.isInteger(limit) || limit < 1 || limit > 50)
+			throw new Error("--limit must be between 1 and 50");
+		if (options.all) {
+			if (query || options.search)
+				throw new Error(
+					"--all tags all bookmarks; omit the ranking query and --search",
+				);
+			const accountFilter =
+				options.account && options.account !== "all"
+					? options.account
+					: undefined;
+			const ids = getNativeDb()
+				.prepare(
+					`select distinct tweet_id from tweet_collections where kind = 'bookmarks' ${accountFilter ? "and account_id = ?" : ""} order by tweet_id`,
+				)
+				.all(...(accountFilter ? [accountFilter] : [])) as {
+				tweet_id: string;
+			}[];
+			let requests = 0;
+			let inputTokens = 0;
+			let analyzed = 0;
+			for (let offset = 0; offset < ids.length; offset += 50) {
+				const batch = await analyzeBookmarks({
+					ids: ids.slice(offset, offset + 50).map((row) => row.tweet_id),
+					account: options.account,
+					cachedOnly: Boolean(options.cachedOnly),
+				});
+				requests += batch.requests;
+				inputTokens += batch.inputTokens;
+				analyzed += batch.items.length;
+				console.error(
+					`JEV tags: ${analyzed}/${ids.length} bookmarks (${inputTokens} input tokens)`,
+				);
+				if (inputTokens >= 2_000_000) {
+					console.error(
+						"Stopped at the 2M input-token run budget; rerun to resume from cache.",
+					);
+					break;
+				}
+			}
+			print(
+				{
+					analyzed,
+					total: ids.length,
+					requests,
+					inputTokens,
+					partial: analyzed < ids.length,
+				},
+				true,
+			);
+			return;
+		}
+		const items = listTimelineItems({
+			resource: "home",
+			account: options.account,
+			bookmarkedOnly: true,
+			search: options.search,
+			limit,
+		});
+		const analysis = await analyzeBookmarks({
+			ids: items.map((item) => item.id),
+			account: options.account,
+			query,
+			cachedOnly: Boolean(options.cachedOnly),
+		});
+		const byId = new Map(analysis.items.map((item) => [item.id, item]));
+		const ranked = items
+			.map((item) => ({ ...item, intelligence: byId.get(item.id) ?? null }))
+			.sort(
+				(left, right) =>
+					(right.intelligence?.relevance?.score ?? -1) -
+					(left.intelligence?.relevance?.score ?? -1),
+			);
+		print({ ...analysis, items: ranked }, true);
 	});
 
 const linksCommand = program
@@ -1386,7 +1590,65 @@ const dmsCommand = program.command("dms").description("Direct messages");
 
 const syncCommand = program
 	.command("sync")
-	.description("Refresh live Twitter collections into the local store");
+	.description(
+		"Refresh saved sources and live Twitter collections into the local store",
+	);
+
+syncCommand
+	.command("github-stars")
+	.description(
+		"Hydrate the authenticated gh account's stars, topics, and READMEs",
+	)
+	.option(
+		"--max-pages <n>",
+		"Cap GitHub star pages (100 repositories per page)",
+	)
+	.option("--no-readme", "Skip fetching READMEs; preserve any cached text")
+	.action(async (options) => {
+		const maxPages =
+			options.maxPages === undefined
+				? undefined
+				: parsePositiveIntegerOption(options.maxPages, "--max-pages");
+		if (options.maxPages !== undefined && maxPages === undefined) return;
+		const result = await syncGithubStars({
+			maxPages,
+			includeReadme: options.readme,
+		});
+		await autoSyncAfterWrite();
+		print(result, program.opts().json ?? false);
+	});
+
+syncCommand
+	.command("instagram-saved")
+	.description(
+		"Hydrate one Instagram saved collection through installed Chrome",
+	)
+	.requiredOption("--account <username>", "Signed-in Instagram username")
+	.option("--collection <name>", "Exact saved collection name", "AI")
+	.option(
+		"--max-items <n>",
+		"Cap collection posts; capped scans are partial",
+		"500",
+	)
+	.option(
+		"--chrome-profile <profile>",
+		"Chrome profile with the Instagram session",
+	)
+	.action(async (options) => {
+		const maxItems = parsePositiveIntegerOption(
+			options.maxItems,
+			"--max-items",
+		);
+		if (maxItems === undefined) return;
+		const result = await syncInstagramCollection({
+			username: options.account,
+			collection: options.collection,
+			maxItems,
+			chromeProfile: options.chromeProfile,
+		});
+		await autoSyncAfterWrite();
+		print(result, program.opts().json ?? false);
+	});
 
 syncCommand
 	.command("timeline")
@@ -1541,9 +1803,9 @@ syncCommand
 for (const kind of ["likes", "bookmarks"] as const) {
 	syncCommand
 		.command(kind)
-		.description(`Refresh live ${kind} through xurl or bird`)
+		.description(`Refresh live ${kind}; bookmarks default to Chrome/Playwright`)
 		.option("--account <accountId>", "Account id")
-		.option("--mode <mode>", "auto, xurl, or bird", "auto")
+		.option("--mode <mode>", "playwright (bookmarks), auto, xurl, or bird")
 		.option("--limit <n>", "Per-page/result limit", "20")
 		.option("--all", "Fetch every retrievable page")
 		.option(
@@ -1614,7 +1876,7 @@ for (const direction of ["followers", "following"] as const) {
 
 const jobsCommand = program
 	.command("jobs")
-	.description("Run and install background Birdclaw jobs");
+	.description("Run and install background Nalanda jobs");
 
 jobsCommand
 	.command("sync-account")
@@ -1638,7 +1900,7 @@ jobsCommand
 		const result = await runAccountSyncJob({
 			account: options.account,
 			steps: parseAccountSyncSteps(options.steps),
-			mode: options.mode as TimelineCollectionMode,
+			mode: options.mode as Exclude<TimelineCollectionMode, "playwright">,
 			limit: Number(options.limit),
 			maxPages: Number(options.maxPages),
 			refresh: Boolean(options.refresh),
@@ -1686,7 +1948,7 @@ jobsCommand
 			program: options.program,
 			account: options.account,
 			steps: parseAccountSyncSteps(options.steps),
-			mode: options.mode as TimelineCollectionMode,
+			mode: options.mode as Exclude<TimelineCollectionMode, "playwright">,
 			limit: Number(options.limit),
 			maxPages: Number(options.maxPages),
 			refresh: options.refresh,
@@ -1706,7 +1968,7 @@ jobsCommand
 	.command("sync-bookmarks")
 	.description("Refresh live bookmarks and append a JSONL audit entry")
 	.option("--account <accountId>", "Account id")
-	.option("--mode <mode>", "auto, xurl, or bird", "auto")
+	.option("--mode <mode>", "playwright, auto, xurl, or bird")
 	.option("--limit <n>", "Per-page/result limit", "100")
 	.option("--all", "Fetch every retrievable page")
 	.option("--max-pages <n>", "Stop after N pages", "5")
@@ -1736,7 +1998,7 @@ jobsCommand
 	.option("--label <label>", "LaunchAgent label")
 	.option("--interval-seconds <seconds>", "Launch interval", "10800")
 	.option("--program <path>", "birdclaw executable or command", "birdclaw")
-	.option("--mode <mode>", "auto, xurl, or bird", "auto")
+	.option("--mode <mode>", "playwright, auto, xurl, or bird")
 	.option("--limit <n>", "Per-page/result limit", "100")
 	.option("--all", "Fetch every retrievable page")
 	.option("--max-pages <n>", "Stop after N pages", "5")

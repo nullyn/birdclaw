@@ -7,9 +7,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { resetBirdclawPathsForTests } from "./config";
 import { getNativeDb, resetDatabaseForTests } from "./db";
 import { listTimelineItems } from "./queries";
+import type { BrowserBookmarkOptions } from "./bookmarks-browser";
 
 const mocks = vi.hoisted(() => ({
 	listBookmarkedTweetsViaBird: vi.fn(),
+	listBrowserBookmarks: vi.fn(),
 	listHomeTimelineViaBird: vi.fn(),
 	listLikedTweetsViaBird: vi.fn(),
 	listBookmarkedTweetsViaXurl: vi.fn(),
@@ -34,6 +36,18 @@ vi.mock("./bird", () => ({
 	listLikedTweetsViaBirdEffect: (options: unknown) =>
 		Effect.tryPromise({
 			try: () => mocks.listLikedTweetsViaBird(options),
+			catch: (error) => error,
+		}),
+}));
+
+vi.mock("./bookmarks-browser", () => ({
+	listBrowserBookmarksEffect: (options: BrowserBookmarkOptions) =>
+		Effect.tryPromise({
+			try: async () => {
+				const payload = await mocks.listBrowserBookmarks(options);
+				options.onPage?.(payload);
+				return payload;
+			},
 			catch: (error) => error,
 		}),
 }));
@@ -134,6 +148,103 @@ describe("live timeline collection sync", () => {
 			count: 1,
 		});
 		expect(mocks.listLikedTweetsViaXurl).toHaveBeenCalledTimes(1);
+	});
+
+	it("uses mocked Playwright bookmarks by default without dispatching to xurl", async () => {
+		setupTempHome();
+		mocks.listBrowserBookmarks.mockResolvedValue({
+			data: [makeTweet("browser_bookmark_1", "from browser")],
+			includes: { users: [makeUser()] },
+			meta: { result_count: 1, partial: true },
+		});
+		const { syncTimelineCollection } =
+			await import("./timeline-collections-live");
+
+		const result = await syncTimelineCollection({
+			kind: "bookmarks",
+			limit: 5,
+			refresh: true,
+		});
+
+		expect(result).toMatchObject({ ok: true, source: "playwright", count: 1 });
+		expect(mocks.listBrowserBookmarks).toHaveBeenCalledWith(
+			expect.objectContaining({
+				username: "steipete",
+				limit: 5,
+				all: false,
+				maxPages: undefined,
+			}),
+		);
+		expect(mocks.listBookmarkedTweetsViaXurl).not.toHaveBeenCalled();
+		const cached = await syncTimelineCollection({
+			kind: "bookmarks",
+			limit: 5,
+		});
+		expect(cached).toMatchObject({ source: "cache", partial: true });
+	});
+
+	it("persists quote context without adding it to the bookmark collection", async () => {
+		setupTempHome();
+		mocks.listBrowserBookmarks.mockResolvedValue({
+			data: [
+				{
+					...makeTweet("bookmark_with_quote", "A saved reply"),
+					referenced_tweets: [{ type: "quoted", id: "quote_context" }],
+				},
+			],
+			includes: {
+				users: [makeUser("42", "sam"), makeUser("84", "quoted_author")],
+				tweets: [
+					{
+						...makeTweet("quote_context", "The full quoted post", "84"),
+						referenced_tweets: [],
+					},
+				],
+			},
+			meta: { result_count: 1 },
+		});
+		const { syncTimelineCollection } =
+			await import("./timeline-collections-live");
+
+		await syncTimelineCollection({
+			kind: "bookmarks",
+			limit: 5,
+			refresh: true,
+		});
+		const db = getNativeDb();
+		const quote = db
+			.prepare("select id, text, bookmarked, liked from tweets where id = ?")
+			.get("quote_context");
+		const quoteCollections = db
+			.prepare(
+				"select account_id from tweet_collections where tweet_id = ? and kind = 'bookmarks'",
+			)
+			.all("quote_context");
+		const saved = db
+			.prepare(
+				"select id, quoted_tweet_id, bookmarked from tweets where id = ?",
+			)
+			.get("bookmark_with_quote");
+
+		expect(quote).toMatchObject({
+			id: "quote_context",
+			text: "The full quoted post",
+			bookmarked: 0,
+			liked: 0,
+		});
+		expect(quoteCollections).toEqual([]);
+		expect(saved).toMatchObject({
+			id: "bookmark_with_quote",
+			quoted_tweet_id: "quote_context",
+			bookmarked: 1,
+		});
+		expect(
+			db
+				.prepare(
+					"select count(*) as count from tweet_collections where tweet_id = ? and kind = 'bookmarks'",
+				)
+				.get("bookmark_with_quote"),
+		).toMatchObject({ count: 1 });
 	});
 
 	it("validates collection sync effects only when run", async () => {

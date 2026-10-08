@@ -22,18 +22,22 @@ function resolvedVitestConfig() {
 }
 
 describe("package configuration", () => {
-	it("runs the published bin wrapper without tsx CLI startup", async () => {
-		const { stdout } = await execFileAsync(
-			process.execPath,
-			["bin/birdclaw.mjs", "--version"],
-			{
-				cwd: new URL("..", import.meta.url),
-				env: process.env,
-			},
-		);
+	it.each(["bin/nalanda.mjs", "bin/birdclaw.mjs"])(
+		"runs %s without tsx CLI startup",
+		async (binPath) => {
+			const { stdout } = await execFileAsync(
+				process.execPath,
+				[binPath, "--version"],
+				{
+					cwd: new URL("..", import.meta.url),
+					env: process.env,
+				},
+			);
 
-		expect(stdout.trim()).toBe(packageJson.version);
-	}, 15_000);
+			expect(stdout.trim()).toBe(packageJson.version);
+		},
+		15_000,
+	);
 
 	it("keeps published bin files in lint and format script coverage", () => {
 		const binTargets = Object.values(packageJson.bin);

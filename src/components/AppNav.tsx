@@ -72,7 +72,7 @@ export function AppNav({ compact = false }: { compact?: boolean }) {
 							compact ? sidebarBrandCopyCompactClass : sidebarBrandCopyClass
 						}
 					>
-						<span className={sidebarBrandTitleClass}>birdclaw</span>
+						<span className={sidebarBrandTitleClass}>nalanda</span>
 						<span className={sidebarBrandTaglineClass}>
 							Fast search for your archive.
 						</span>

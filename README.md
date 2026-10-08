@@ -1,6 +1,6 @@
-# birdclaw 🪶 — Local Twitter memory in SQLite: archives, DMs, likes, bookmarks
+# Nalanda — Local saved knowledge for agents
 
-`birdclaw` is a local-first Twitter workspace: archive import, cached live reads, focused triage, and reply flows in one local web app + CLI. Built by [@steipete](https://github.com/steipete/).
+Nalanda is a local knowledge library built on [Birdclaw](https://github.com/steipete/birdclaw) by [@steipete](https://github.com/steipete/). Its agent interface is a JSON CLI backed by SQLite. It syncs X bookmarks, the Instagram AI collection, and GitHub stars. Unified search combines local semantic embeddings, keyword matches, and cached JEV reranking. See [the Nalanda design](docs/nalanda.md) for scope and implementation status.
 
 Status: WIP. Real and usable. Not done. Expect schema churn, transport gaps, and rough edges while the core settles.
 
@@ -24,7 +24,8 @@ Status: WIP. Real and usable. Not done. Expect schema churn, transport gaps, and
 - selective archive re-imports for one stale slice without wiping the rest of the local store
 - archive import for bookmark exports when present
 - archive import streams bundled media files into the local originals cache and extracts `video_info.variants[]` for video and animated-GIF rows
-- live authored sync through `xurl`, plus likes and bookmarks through `xurl` or `bird`
+- live authored sync through `xurl`, likes through `xurl` or `bird`, and bookmarks through Chrome/Playwright by default
+- cached JEV topic tags and query relevance ranking for local bookmarks
 - cache-first followers/following sync through `bird` or `xurl`
 - local follow graph queries for top followers, unfollows, mutuals, and non-mutual following
 - Git-friendly text backups with yearly tweet shards and per-conversation DM shards
@@ -158,10 +159,10 @@ intentionally left out. Run it separately, for example from cron or launchd
 every few hours:
 
 ```bash
-birdclaw media fetch --json
-birdclaw media fetch --dry-run --limit 20
-birdclaw media fetch --include-video --video-pacing-ms 1500 --max-bytes 209715200 --json
-birdclaw media fetch --no-include-video --parallel 3 --pacing-ms 250 --json
+nalanda media fetch --json
+nalanda media fetch --dry-run --limit 20
+nalanda media fetch --include-video --video-pacing-ms 1500 --max-bytes 209715200 --json
+nalanda media fetch --no-include-video --parallel 3 --pacing-ms 250 --json
 ```
 
 Notes:
@@ -184,18 +185,18 @@ Notes:
 
 ## Install
 
-Homebrew:
+From this checkout (Node 26):
 
 ```bash
-brew install steipete/tap/birdclaw
-```
-
-From source:
-
-```bash
-fnm use
 pnpm install
+pnpm link --global
+nalanda --help
 ```
+
+`birdclaw` remains a compatibility command. Nalanda reuses an existing
+`~/.birdclaw/birdclaw.sqlite` installation. Fresh installations use
+`~/.nalanda/nalanda.sqlite`; `NALANDA_HOME` and `NALANDA_CONFIG` override the
+location. Existing `BIRDCLAW_HOME` and `BIRDCLAW_CONFIG` settings still work.
 
 ## Run
 
@@ -214,23 +215,23 @@ http://localhost:3000
 Initialize local state:
 
 ```bash
-birdclaw init
-birdclaw auth status --json
-birdclaw db stats --json
+nalanda init
+nalanda auth status --json
+nalanda db stats --json
 ```
 
 Find and import an archive:
 
 ```bash
-birdclaw archive find --json
-birdclaw import archive --json
-birdclaw import archive ~/Downloads/twitter-archive-2025.zip --json
+nalanda archive find --json
+nalanda import archive --json
+nalanda import archive ~/Downloads/twitter-archive-2025.zip --json
 ```
 
 Optional profile hydration can improve bios, follower counts, and avatars, but it performs live X profile reads and can spend API credits on large archives:
 
 ```bash
-birdclaw import hydrate-profiles --json
+nalanda import hydrate-profiles --json
 ```
 
 `import archive` is idempotent. Re-running parses follower/following edges into the local follow graph, streams bundled media files under `data/tweets_media/`, `data/direct_messages_media/`, and the other archive media folders into `~/.birdclaw/media/originals/archive/<kind>/<id>/`, and pulls `video_info.variants[]` so archive video and animated-GIF rows carry mp4 URLs for the live media fetcher. Already-extracted files are skipped when size matches.
@@ -238,9 +239,9 @@ birdclaw import hydrate-profiles --json
 Re-import only one part of a newer archive when you already have live or local data you want to keep:
 
 ```bash
-birdclaw import archive ~/Downloads/twitter-archive-2026.zip --select tweets --json
-birdclaw import archive ~/Downloads/twitter-archive-2026.zip --select likes,bookmarks --json
-birdclaw import archive ~/Downloads/twitter-archive-2026.zip --select directMessages --json
+nalanda import archive ~/Downloads/twitter-archive-2026.zip --select tweets --json
+nalanda import archive ~/Downloads/twitter-archive-2026.zip --select likes,bookmarks --json
+nalanda import archive ~/Downloads/twitter-archive-2026.zip --select directMessages --json
 ```
 
 Valid `--select` slices are `tweets`, `likes`, `bookmarks`, `profiles`, `directMessages`, `followers`, and `following`. `dms` and `direct-messages` are accepted aliases for `directMessages`.
@@ -248,19 +249,19 @@ Valid `--select` slices are `tweets`, `likes`, `bookmarks`, `profiles`, `directM
 Back up the local SQLite store as canonical JSONL text:
 
 ```bash
-birdclaw backup sync --repo ~/Projects/backup-birdclaw --remote https://github.com/steipete/backup-birdclaw.git --json
+nalanda backup sync --repo ~/Projects/backup-birdclaw --remote https://github.com/steipete/backup-birdclaw.git --json
 ```
 
 Merge the backup into the current `BIRDCLAW_HOME`:
 
 ```bash
-birdclaw backup import ~/Projects/backup-birdclaw --json
+nalanda backup import ~/Projects/backup-birdclaw --json
 ```
 
 Start the app:
 
 ```bash
-birdclaw serve
+nalanda serve
 ```
 
 `birdclaw serve` binds the dev server to `127.0.0.1` and enables local
@@ -295,14 +296,14 @@ pnpm cli search tweets --bookmarked --limit 20 --json
 
 ### Sync authored tweets, likes, bookmarks, home timeline, and mentions
 
-`auto` tries `xurl` first for likes/bookmarks, then falls back to `bird`. Use `bird` directly when the API path is unavailable for the account/token you have locally. For repeated xurl collection syncs, add `--early-stop` to stop paging once a whole page already exists locally; without `--all` or `--max-pages`, it caps at 10 pages.
+Bookmarks default to Chrome/Playwright; likes default to `auto`. Explicit `auto` tries `xurl` first for likes/bookmarks, then falls back to `bird`. Use `bird` directly when the API path is unavailable for the account/token you have locally. For repeated xurl collection syncs, add `--early-stop` to stop paging once a whole page already exists locally; without `--all` or `--max-pages`, it caps at 10 pages.
 
 ```bash
 pnpm cli sync authored --mode xurl --limit 100 --json
 pnpm cli sync likes --mode auto --limit 100 --refresh --json
-pnpm cli sync bookmarks --mode auto --limit 100 --refresh --json
+pnpm cli sync bookmarks --mode playwright --limit 100 --refresh --json
 pnpm cli sync likes --mode auto --limit 100 --max-pages 5 --early-stop --refresh --json
-pnpm cli sync bookmarks --mode auto --limit 100 --max-pages 5 --early-stop --refresh --json
+pnpm cli sync bookmarks --mode playwright --limit 100 --max-pages 5 --early-stop --refresh --json
 pnpm cli sync bookmarks --mode bird --all --max-pages 5 --limit 100 --refresh --json
 pnpm cli sync timeline --limit 100 --refresh --json
 pnpm cli sync mentions --mode xurl --limit 100 --max-pages 3 --refresh --json
@@ -378,13 +379,27 @@ Notes:
 - `sync authored`, `sync mentions`, `sync mention-threads`, `sync likes`, `sync bookmarks`, and `sync timeline` store live results in the canonical local store; per-account authored/home/mention/like/bookmark membership is kept as edges so shared tweets do not clobber account ownership
 - the web UI has explicit Sync buttons for home timeline, mentions, likes, bookmarks, and DMs; they call the same sync paths and then reload the local DB-backed view
 
+### Bookmarks without X API credits
+
+Bookmark sync now defaults to Chrome/Playwright. Sign into X in Chrome, then run:
+
+```bash
+pnpm cli sync bookmarks --max-pages 10 --refresh --json
+pnpm cli bookmarks-analyze --all --json
+```
+
+Set `TYPESAFE_API_KEY` in the environment or the ignored project `.env` file for
+JEV tagging and ranking. Use **Analyze with JEV** on the Bookmarks page to analyze
+up to 50 loaded posts and rank them against a question. See [Bookmarks](docs/bookmarks.md)
+for Chrome profiles, caching, batch analysis, and current limits.
+
 ### Research bookmarks and threads
 
 `birdclaw research` turns bookmarked tweets into a markdown brief with local thread expansion, live ancestor lookup when needed, and extracted links/handles:
 
 ```bash
-birdclaw research "codex" --limit 20 --thread-depth 10 --json
-birdclaw research --account acct_primary --out ~/research/codex.md
+nalanda research "codex" --limit 20 --thread-depth 10 --json
+nalanda research --account acct_primary --out ~/research/codex.md
 ```
 
 ### Discuss keyword searches
@@ -392,9 +407,9 @@ birdclaw research --account acct_primary --out ~/research/codex.md
 `birdclaw discuss` fetches live keyword matches through `bird` or `xurl`, stores them as local `search` tweets, then streams an OpenAI Markdown summary and discussion. DMs are excluded unless explicitly included.
 
 ```bash
-birdclaw discuss "local-first" --mode bird
-birdclaw discuss "sync engine" --question "what changed over time?"
-birdclaw discuss "prototype" --include-dms --limit 500 --max-pages 5 --json
+nalanda discuss "local-first" --mode bird
+nalanda discuss "sync engine" --question "what changed over time?"
+nalanda discuss "prototype" --include-dms --limit 500 --max-pages 5 --json
 ```
 
 ### Profile analysis
@@ -408,8 +423,8 @@ When `xurl` has multiple OAuth2 labels, set `BIRDCLAW_XURL_OAUTH2_APP` and `BIRD
 The web UI uses `/profiles/<handle>` for the canonical profile page, `/profile-analyze` for the analysis/search utility page, and `/rate-limits` for observed `xurl` pressure, recent 429s, and the active Profile Analyse throttle settings.
 
 ```bash
-birdclaw profile-analyze steipete
-birdclaw profile-analyse openai --max-pages 20 --max-conversations 40 --conversation-delay-ms 3100 --rate-limit-retries 2 --json
+nalanda profile-analyze steipete
+nalanda profile-analyse openai --max-pages 20 --max-conversations 40 --conversation-delay-ms 3100 --rate-limit-retries 2 --json
 ```
 
 ### What happened today
@@ -417,11 +432,11 @@ birdclaw profile-analyse openai --max-pages 20 --max-conversations 40 --conversa
 `birdclaw today` streams a local "what happened" digest from the SQLite store. It uses the OpenAI Responses API with `gpt-5.5`, medium reasoning, and priority service tier by default. Set `OPENAI_API_KEY`; override with `BIRDCLAW_AI_MODEL`, `BIRDCLAW_OPENAI_REASONING_EFFORT`, or `BIRDCLAW_OPENAI_SERVICE_TIER` when needed.
 
 ```bash
-birdclaw today
-birdclaw digest 24h --refresh
-birdclaw digest week --json
-birdclaw digest --since 2026-05-16T00:00:00Z --until 2026-05-17T00:00:00Z
-birdclaw digest today --include-dms
+nalanda today
+nalanda digest 24h --refresh
+nalanda digest week --json
+nalanda digest --since 2026-05-16T00:00:00Z --until 2026-05-17T00:00:00Z
+nalanda digest today --include-dms
 ```
 
 The web UI exposes the same stream under `What happened`. DMs are excluded unless explicitly enabled. Final structured results are cached by the exact local context hash, model, reasoning effort, and service tier.
@@ -602,14 +617,14 @@ Read paths such as CLI search, inbox, API status/query, and web startup pull + m
 `birdclaw jobs sync-account` refreshes home timeline, mentions, mention threads, likes, bookmarks, and DMs for a selected account, then appends a per-step audit entry.
 
 ```bash
-birdclaw --json jobs sync-account --account acct_openclaw --limit 100 --max-pages 3 --refresh --allow-bird-account
+nalanda --json jobs sync-account --account acct_openclaw --limit 100 --max-pages 3 --refresh --allow-bird-account
 tail -n 5 ~/.birdclaw/audit/account-sync.jsonl | jq .
 ```
 
 On macOS, install the 30-minute LaunchAgent:
 
 ```bash
-birdclaw --json jobs install-account-launchd --account acct_openclaw --program /opt/homebrew/bin/birdclaw --env-path ~/.config/bird/openclaw.env --allow-bird-account
+nalanda --json jobs install-account-launchd --account acct_openclaw --program /opt/homebrew/bin/birdclaw --env-path ~/.config/bird/openclaw.env --allow-bird-account
 ```
 
 Use `--env-path ~/.config/bird/openclaw.env` when launchd needs account-specific `bird` cookies. Pass `--allow-bird-account` only when those cookies match `--account`; otherwise Bird-backed timeline, mentions, and DM steps refuse non-default account writes to avoid misattribution. Use `--steps timeline,mentions,dms` to narrow the scheduled surfaces.
@@ -617,7 +632,7 @@ Use `--env-path ~/.config/bird/openclaw.env` when launchd needs account-specific
 `birdclaw jobs sync-bookmarks` refreshes live bookmarks and appends one JSONL audit entry per run. Each entry includes host, timestamps, duration, before/after bookmark counts, source transport, fetched count, backup sync result, and any error.
 
 ```bash
-birdclaw --json jobs sync-bookmarks --mode auto --limit 100 --max-pages 5 --refresh
+nalanda --json jobs sync-bookmarks --mode playwright --limit 100 --max-pages 5 --refresh
 tail -n 5 ~/.birdclaw/audit/bookmarks-sync.jsonl | jq .
 ```
 
@@ -626,7 +641,7 @@ After a successful bookmark refresh, the job runs the normal backup auto-sync pa
 On macOS, install the 3-hour LaunchAgent after choosing the Birdclaw executable path for that machine:
 
 ```bash
-birdclaw --json jobs install-bookmarks-launchd --program /opt/homebrew/bin/birdclaw
+nalanda --json jobs install-bookmarks-launchd --program /opt/homebrew/bin/birdclaw
 ```
 
 If the machine uses `bird` with browser cookies that are not available to launchd, write an export-only env file with mode `0600` and install with `--env-path ~/.config/bird/env.sh`. Birdclaw sources that file inside the scheduled process without storing the secrets in the plist.
@@ -709,3 +724,19 @@ Workflow: [ci.yml](.github/workflows/ci.yml)
 - [cli.md](docs/cli.md)
 - [data-architecture.md](docs/data-architecture.md)
 - [follow-graph.md](docs/follow-graph.md)
+
+## Unified saved-content search
+
+From this checkout with Node 26 and Ollama running:
+
+```bash
+ollama pull embeddinggemma-2
+pnpm cli --json index knowledge
+pnpm cli --json search knowledge "How can an AI assistant remember earlier conversations?"
+pnpm cli --json search knowledge "agent memory" --source github --no-rerank
+```
+
+The result includes evidence passages, citation URLs, timestamps, and index
+coverage. `--no-rerank` keeps search entirely local. Sync sources before indexing;
+`--refresh-index` refreshes embeddings from already captured local content.
+See [Nalanda](docs/nalanda.md) for source scope, recovery, and current limits.

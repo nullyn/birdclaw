@@ -60,12 +60,14 @@ Liked tweets land in the same `tweets` table as archive imports and can be queri
 
 ## sync bookmarks
 
-Mirror Bookmarks:
+Mirror Bookmarks through installed Chrome/Playwright by default, without X API
+credits. Chrome must be signed into the selected X account. See [Bookmarks](bookmarks.md)
+for Chrome profiles and JEV tagging/ranking.
 
 ```bash
-birdclaw sync bookmarks --mode auto --limit 100 --refresh --json
+birdclaw sync bookmarks --mode playwright --limit 100 --refresh --json
 birdclaw sync bookmarks --mode bird --all --max-pages 5 --limit 100 --refresh --json
-birdclaw sync bookmarks --mode auto --limit 100 --max-pages 5 --early-stop --refresh --json
+birdclaw sync bookmarks --mode playwright --limit 100 --max-pages 5 --early-stop --refresh --json
 ```
 
 Bookmarks are queried via `birdclaw search tweets --bookmarked` and drive the [research](research.md) workflow.

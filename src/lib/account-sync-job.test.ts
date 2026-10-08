@@ -240,6 +240,41 @@ describe("account sync job", () => {
 		});
 	});
 
+	it("uses Chrome for default bookmark steps in account jobs", async () => {
+		tempDir = mkdtempSync(path.join(os.tmpdir(), "birdclaw-account-job-"));
+		const logPath = path.join(tempDir, "audit.jsonl");
+		const lockPath = path.join(tempDir, "sync.lock");
+		const db = {
+			prepare: () => ({
+				get: () => ({ id: "acct_primary" }),
+			}),
+		} as never;
+		syncTimelineCollectionMock.mockResolvedValue({
+			source: "playwright",
+			count: 4,
+		});
+
+		const result = await runAccountSyncJob({
+			account: "acct_openclaw",
+			steps: ["bookmarks"],
+			logPath,
+			lockPath,
+			db,
+		});
+
+		expect(syncTimelineCollectionMock).toHaveBeenCalledWith(
+			expect.objectContaining({
+				kind: "bookmarks",
+				account: "acct_openclaw",
+				mode: "playwright",
+			}),
+		);
+		expect(result).toMatchObject({
+			ok: true,
+			steps: [{ kind: "bookmarks", ok: true, count: 4, source: "playwright" }],
+		});
+	});
+
 	it("refuses explicit Bird saved collection syncs for non-default accounts without an assertion", async () => {
 		tempDir = mkdtempSync(path.join(os.tmpdir(), "birdclaw-account-job-"));
 		const logPath = path.join(tempDir, "audit.jsonl");

@@ -5,6 +5,8 @@ import {
 	listLikedTweetsViaBirdEffect,
 } from "./bird";
 import { getNativeDb } from "./db";
+import { getBirdclawConfig } from "./config";
+import { listBrowserBookmarksEffect } from "./bookmarks-browser";
 import { runEffectPromise, tryPromise } from "./effect-runtime";
 import { buildMediaJsonFromIncludes, countTweetMedia } from "./media-includes";
 import { readSyncCache, writeSyncCache } from "./sync-cache";
@@ -22,7 +24,7 @@ import {
 } from "./xurl";
 
 export type TimelineCollectionKind = "likes" | "bookmarks";
-export type TimelineCollectionMode = "auto" | "xurl" | "bird";
+export type TimelineCollectionMode = "auto" | "xurl" | "bird" | "playwright";
 export interface SyncTimelineCollectionOptions {
 	kind: TimelineCollectionKind;
 	account?: string;
@@ -234,7 +236,7 @@ function mergeTimelineCollectionIntoLocalStore(
 	accountId: string,
 	kind: TimelineCollectionKind,
 	payload: XurlMentionsResponse,
-	source: "xurl" | "bird",
+	source: "xurl" | "bird" | "playwright",
 ) {
 	const usersById = new Map(
 		(payload.includes?.users ?? []).map((user) => [user.id, user]),
@@ -253,7 +255,7 @@ function mergeTimelineCollectionIntoLocalStore(
       account_id = tweets.account_id,
       author_profile_id = excluded.author_profile_id,
       kind = case
-        when tweets.kind in ('authored', 'home', 'mention') then tweets.kind
+        when tweets.kind in ('authored', 'home', 'mention') or excluded.kind = 'search' then tweets.kind
         else excluded.kind
       end,
       text = excluded.text,
@@ -284,7 +286,15 @@ function mergeTimelineCollectionIntoLocalStore(
 
 	db.transaction(() => {
 		const updatedAt = new Date().toISOString();
-		for (const tweet of payload.data) {
+		const collectedIds = new Set(payload.data.map((tweet) => tweet.id));
+		const allTweets = new Map(
+			[...(payload.includes?.tweets ?? []), ...payload.data].map((tweet) => [
+				tweet.id,
+				tweet,
+			]),
+		);
+		for (const tweet of allTweets.values()) {
+			const isCollected = collectedIds.has(tweet.id);
 			const author =
 				usersById.get(tweet.author_id) ??
 				({
@@ -301,27 +311,28 @@ function mergeTimelineCollectionIntoLocalStore(
 				tweet.id,
 				accountId,
 				profile.profile.id,
-				tweetKind,
+				isCollected ? tweetKind : "search",
 				tweet.text,
 				tweet.created_at,
 				replyToId ? 1 : 0,
 				replyToId,
 				Number(tweet.public_metrics?.like_count ?? 0),
 				countTweetMedia(tweet),
-				bookmarked,
-				liked,
+				isCollected ? bookmarked : 0,
+				isCollected ? liked : 0,
 				JSON.stringify(tweet.entities ?? {}),
 				buildMediaJsonFromIncludes(tweet, payload.includes?.media),
 				quotedTweetId,
 			);
-			upsertCollection.run(
-				accountId,
-				tweet.id,
-				kind,
-				source,
-				JSON.stringify(tweet),
-				updatedAt,
-			);
+			if (isCollected)
+				upsertCollection.run(
+					accountId,
+					tweet.id,
+					kind,
+					source,
+					JSON.stringify(tweet),
+					updatedAt,
+				);
 			replaceTweetFts(db, tweet.id, tweet.text);
 		}
 	})();
@@ -452,7 +463,9 @@ function fetchBirdCollectionEffect({
 export function syncTimelineCollectionEffect({
 	kind,
 	account,
-	mode = "auto",
+	mode = kind === "bookmarks"
+		? (getBirdclawConfig().bookmarks?.mode ?? "playwright")
+		: "auto",
 	limit = 20,
 	all = false,
 	maxPages,
@@ -461,10 +474,22 @@ export function syncTimelineCollectionEffect({
 	earlyStop = false,
 }: SyncTimelineCollectionOptions) {
 	return Effect.gen(function* () {
+		if (!["auto", "bird", "xurl", "playwright"].includes(mode)) {
+			return yield* Effect.fail(new Error(`Unknown collection mode: ${mode}`));
+		}
+		if (mode === "playwright" && kind !== "bookmarks") {
+			return yield* Effect.fail(
+				new Error("Playwright mode supports bookmarks only"),
+			);
+		}
 		yield* trySync(() => assertLimit(limit));
 		const parsedMaxPages = yield* trySync(() => parseMaxPages(maxPages));
 		const shouldApplyEarlyStopCap =
-			earlyStop && !all && parsedMaxPages === null && mode !== "bird";
+			earlyStop &&
+			!all &&
+			parsedMaxPages === null &&
+			mode !== "bird" &&
+			mode !== "playwright";
 		const xurlMaxPages = shouldApplyEarlyStopCap
 			? DEFAULT_EARLY_STOP_MAX_PAGES
 			: parsedMaxPages;
@@ -493,6 +518,7 @@ export function syncTimelineCollectionEffect({
 				accountId: resolvedAccount.accountId,
 				count: cached.value.data.length,
 				payload: cached.value,
+				partial: cached.value.meta?.partial === true,
 				...(saturatedAtPage === undefined
 					? {}
 					: { saturated_at_page: saturatedAtPage }),
@@ -505,9 +531,39 @@ export function syncTimelineCollectionEffect({
 			);
 		}
 
-		let source: "xurl" | "bird";
+		let source: "xurl" | "bird" | "playwright";
 		let payload: XurlMentionsResponse;
-		if (mode === "bird") {
+		if (mode === "playwright") {
+			payload = yield* listBrowserBookmarksEffect({
+				username: resolvedAccount.username,
+				limit,
+				all,
+				maxPages: parsedMaxPages ?? undefined,
+				isPageAlreadyLocal: earlyStop
+					? (payload) => {
+							const dedupe = getCollectionPageDedupe(
+								db,
+								resolvedAccount.accountId,
+								kind,
+								payload.data.map((tweet) => tweet.id),
+							);
+							return (
+								dedupe.uniqueTweetCount > 0 &&
+								dedupe.existingTweetIds.size === dedupe.uniqueTweetCount
+							);
+						}
+					: undefined,
+				onPage: (payload) =>
+					mergeTimelineCollectionIntoLocalStore(
+						db,
+						resolvedAccount.accountId,
+						kind,
+						payload,
+						"playwright",
+					),
+			});
+			source = "playwright";
+		} else if (mode === "bird") {
 			payload = yield* fetchBirdCollectionEffect({
 				kind,
 				limit,
@@ -549,15 +605,17 @@ export function syncTimelineCollectionEffect({
 			}
 		}
 
-		yield* trySync(() =>
-			mergeTimelineCollectionIntoLocalStore(
-				db,
-				resolvedAccount.accountId,
-				kind,
-				payload,
-				source,
-			),
-		);
+		if (mode !== "playwright") {
+			yield* trySync(() =>
+				mergeTimelineCollectionIntoLocalStore(
+					db,
+					resolvedAccount.accountId,
+					kind,
+					payload,
+					source,
+				),
+			);
+		}
 		yield* trySync(() => writeSyncCache(cacheKey, payload, db));
 		const saturatedAtPage = readSaturatedAtPage(payload);
 
@@ -568,6 +626,7 @@ export function syncTimelineCollectionEffect({
 			accountId: resolvedAccount.accountId,
 			count: payload.data.length,
 			payload,
+			partial: payload.meta?.partial === true,
 			...(saturatedAtPage === undefined
 				? {}
 				: { saturated_at_page: saturatedAtPage }),

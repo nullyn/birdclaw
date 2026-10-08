@@ -14,6 +14,20 @@ import {
 
 const tempDirs: string[] = [];
 
+function isWellFormedUtf16(text: string) {
+	for (let offset = 0; offset < text.length; offset += 1) {
+		const code = text.charCodeAt(offset);
+		if (code >= 0xd800 && code <= 0xdbff) {
+			const next = text.charCodeAt(offset + 1);
+			if (!(next >= 0xdc00 && next <= 0xdfff)) return false;
+			offset += 1;
+		} else if (code >= 0xdc00 && code <= 0xdfff) {
+			return false;
+		}
+	}
+	return true;
+}
+
 function setTestHome() {
 	const dir = mkdtempSync(
 		path.join(os.tmpdir(), "birdclaw-knowledge-passages-"),
@@ -157,6 +171,12 @@ describe("knowledge documents", () => {
 					savedAtSource: "first-seen",
 					publishedAt: "2026-02-02",
 					publishedAtSource: "visible-time",
+					authorLinks: [
+						"https://example.com/guide",
+						"https://example.com/guide",
+						null,
+						"javascript:invalid",
+					],
 				},
 			],
 		] as const) {
@@ -189,6 +209,7 @@ describe("knowledge documents", () => {
 			savedAtSource: "first-seen",
 			publishedAt: "2026-02-02",
 			publishedAtSource: "visible-time",
+			text: "instagram body\n\nAuthor links: https://example.com/guide",
 		});
 		expect(docs[0]?.id).not.toBe(docs[1]?.id);
 	});
@@ -201,12 +222,13 @@ describe("knowledge passages", () => {
 		expect(chunks.length).toBeGreaterThan(1);
 		expect(chunks[0]?.start).toBe(0);
 		expect(chunks.at(-1)?.end).toBe(input.length);
-		for (let i = 0; i < chunks.length; i += 1) {
-			const chunk = chunks[i]!;
+		for (const chunk of chunks) {
 			expect(chunk.text.length).toBeLessThanOrEqual(1600);
 			expect(input.slice(chunk.start, chunk.end)).toBe(chunk.text);
-			if (i > 0) expect(chunk.start).toBeLessThan(chunks[i - 1]!.end);
 		}
+		chunks.slice(1).forEach((chunk, index) => {
+			expect(chunk.start).toBeLessThan(chunks[index]!.end);
+		});
 	});
 
 	it("handles no-whitespace text, short text, and blanks", () => {
@@ -218,6 +240,21 @@ describe("knowledge passages", () => {
 			{ text: " short ", start: 0, end: 7 },
 		]);
 		expect(splitKnowledgePassages(" \n\t ")).toEqual([]);
+	});
+
+	it("keeps chunk boundaries outside UTF-16 surrogate pairs", () => {
+		const input = `a${"😀".repeat(1800)}`;
+		const chunks = splitKnowledgePassages(input);
+		expect(chunks[0]?.start).toBe(0);
+		expect(chunks.at(-1)?.end).toBe(input.length);
+		chunks.forEach((chunk) => {
+			expect(isWellFormedUtf16(chunk.text)).toBe(true);
+			expect(input.slice(chunk.start, chunk.end)).toBe(chunk.text);
+			expect(chunk.end - chunk.start).toBeLessThanOrEqual(1600);
+		});
+		chunks.slice(1).forEach((chunk, index) => {
+			expect(chunk.start).toBeLessThan(chunks[index]!.end);
+		});
 	});
 
 	it("does not rehash metadata timestamps", () => {

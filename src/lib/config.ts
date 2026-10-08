@@ -21,6 +21,11 @@ export type MentionsDataSource = "birdclaw" | "auto" | "xurl" | "bird";
 export type ActionsTransport = "auto" | "bird" | "xurl";
 
 export interface BirdclawConfig {
+	bookmarks?: {
+		mode?: "playwright" | "auto" | "bird" | "xurl";
+		chromeProfile?: string;
+		topics?: string[];
+	};
 	mentions?: {
 		dataSource?: MentionsDataSource;
 		birdCommand?: string;
@@ -44,12 +49,28 @@ export function getBirdclawPaths(): BirdclawPaths {
 		return cachedPaths;
 	}
 
+	const legacyRoot = path.join(os.homedir(), ".birdclaw");
+	const nalandaRoot = path.join(os.homedir(), ".nalanda");
+	const legacyHome = process.env.BIRDCLAW_HOME?.trim();
 	const rootDir =
-		process.env.BIRDCLAW_HOME?.trim() || path.join(os.homedir(), ".birdclaw");
+		process.env.NALANDA_HOME?.trim() ||
+		legacyHome ||
+		(existsSync(path.join(nalandaRoot, "nalanda.sqlite")) ||
+		existsSync(path.join(nalandaRoot, "birdclaw.sqlite"))
+			? nalandaRoot
+			: existsSync(legacyRoot)
+				? legacyRoot
+				: nalandaRoot);
+	const legacyDatabase = path.join(rootDir, "birdclaw.sqlite");
+	const dbPath =
+		existsSync(legacyDatabase) ||
+		(legacyHome && !process.env.NALANDA_HOME?.trim())
+			? legacyDatabase
+			: path.join(rootDir, "nalanda.sqlite");
 
 	cachedPaths = {
 		rootDir,
-		dbPath: path.join(rootDir, "birdclaw.sqlite"),
+		dbPath,
 		mediaOriginalsDir: path.join(rootDir, "media", "originals"),
 		mediaThumbsDir: path.join(rootDir, "media", "thumbs"),
 		configPath: path.join(rootDir, "config.json"),
@@ -78,13 +99,19 @@ export function getBirdclawConfig(): BirdclawConfig {
 	}
 
 	const configPath =
-		process.env.BIRDCLAW_CONFIG?.trim() || getBirdclawPaths().configPath;
+		process.env.NALANDA_CONFIG?.trim() ||
+		process.env.BIRDCLAW_CONFIG?.trim() ||
+		getBirdclawPaths().configPath;
 	cachedConfig = parseConfigFile(configPath);
 	return cachedConfig;
 }
 
 function getConfigPath() {
-	return process.env.BIRDCLAW_CONFIG?.trim() || getBirdclawPaths().configPath;
+	return (
+		process.env.NALANDA_CONFIG?.trim() ||
+		process.env.BIRDCLAW_CONFIG?.trim() ||
+		getBirdclawPaths().configPath
+	);
 }
 
 export function writeBirdclawConfig(config: BirdclawConfig) {

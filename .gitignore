@@ -5,6 +5,12 @@ dist
 dist-ssr
 *.local
 .env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+docs/bookmark-handoff.md
 .nitro
 .tanstack
 .wrangler

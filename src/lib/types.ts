@@ -640,6 +640,7 @@ export interface ProfileRepliesResponse {
 export interface XurlMentionsResponse {
 	data: XurlMentionData[];
 	includes?: {
+		tweets?: XurlMentionData[];
 		users?: XurlMentionUser[];
 		media?: XurlMediaItem[];
 	};

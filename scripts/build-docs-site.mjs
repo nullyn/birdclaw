@@ -12,22 +12,38 @@ import {
 const root = process.cwd();
 const docsDir = path.join(root, "docs");
 const outDir = path.join(root, "dist", "docs-site");
-const repoBase = "https://github.com/steipete/birdclaw";
+const repoBase = "https://github.com/nullyn/birdclaw";
 const repoEditBase = `${repoBase}/edit/main/docs`;
 const cname = readCname();
 const siteBase = cname ? `https://${cname}` : "";
 
-const productName = "birdclaw";
-const productTagline = "Local Twitter memory in SQLite";
+const productName = "nalanda";
+const productTagline = "Local saved knowledge for agents";
 const productDescription =
-	"birdclaw is a local-first Twitter workspace: archive import, cached live reads, focused triage, and reply flows in one local web app + CLI.";
-const brewInstall = "brew install steipete/tap/birdclaw";
+	"Nalanda is a local knowledge library with a JSON CLI backed by SQLite.";
+const brewInstall = "pnpm install && pnpm link --global";
 
 const sections = [
-	["Start", ["index.md", "install.md", "quickstart.md", "configuration.md"]],
+	[
+		"Start",
+		[
+			"index.md",
+			"nalanda.md",
+			"install.md",
+			"quickstart.md",
+			"configuration.md",
+		],
+	],
 	[
 		"Archive & Sync",
-		["archive.md", "sync.md", "media.md", "backup.md", "jobs.md"],
+		[
+			"archive.md",
+			"sync.md",
+			"bookmarks.md",
+			"media.md",
+			"backup.md",
+			"jobs.md",
+		],
 	],
 	[
 		"Reading & Triage",
@@ -537,17 +553,17 @@ function homeHero(page) {
 	return `<header class="home-hero">
         <img class="home-mark" src="birdclaw-mark.png" alt="" aria-hidden="true">
         <p class="eyebrow">Local-first · CLI + Web · SQLite</p>
-        <h1>Your Twitter, <span class="accent">your bird</span>.</h1>
+        <h1>Your knowledge, <span class="accent">within reach</span>.</h1>
         <p class="lede">${escapeHtml(description)}</p>
         <div class="home-cta">
           <a class="btn btn-primary" href="${quickstartRel}">Quickstart</a>
           <a class="btn btn-ghost" href="${repoBase}" rel="noopener">GitHub</a>
-          <div class="home-install" aria-label="Install with Homebrew">
+          <div class="home-install" aria-label="Install from source">
             <span class="prompt" aria-hidden="true">$</span>
             <code>${escapeHtml(brewInstall)}</code>
           </div>
         </div>
-        <div class="home-services" aria-label="Things birdclaw stores locally">
+        <div class="home-services" aria-label="Things Nalanda stores locally">
           ${surfaces.map((s) => `<span>${escapeHtml(s)}</span>`).join("")}
         </div>
         <p><a href="${installRel}">Other install options →</a></p>

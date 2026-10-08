@@ -289,6 +289,20 @@ export interface GeocodedLocationsUnresolvedTable {
 	ttl_until: string | null;
 }
 
+export interface SavedResourcesTable {
+	source: string;
+	account: string;
+	external_id: string;
+	url: string;
+	title: string;
+	author: string;
+	text: string;
+	saved_at: string;
+	fetched_at: string;
+	metadata_json: string;
+	content_hash: string;
+}
+
 export interface BirdclawDatabase {
 	accounts: AccountsTable;
 	profiles: ProfilesTable;
@@ -314,6 +328,7 @@ export interface BirdclawDatabase {
 	follow_events: FollowEventsTable;
 	geocoded_locations: GeocodedLocationsTable;
 	geocoded_locations_unresolved: GeocodedLocationsUnresolvedTable;
+	saved_resources: SavedResourcesTable;
 }
 
 let nativeDb: Database | undefined;
@@ -338,6 +353,82 @@ const BASE_SCHEMA_SQL = `
     is_default integer not null default 0,
     created_at text not null
   );
+
+  create table if not exists knowledge_documents (
+    id text primary key,
+    source text not null,
+    account text not null,
+    content_hash text not null,
+    document_json text not null,
+    indexed_at text not null
+  );
+  create table if not exists knowledge_passages (
+    id text primary key,
+    document_id text not null references knowledge_documents(id) on delete cascade,
+    ordinal integer not null,
+    start_offset integer not null,
+    end_offset integer not null,
+    title text not null,
+    text text not null,
+    embedding_model text not null,
+    dimensions integer not null,
+    embedding blob not null,
+    unique(document_id, ordinal)
+  );
+  create index if not exists idx_knowledge_passages_document on knowledge_passages(document_id);
+  create index if not exists idx_knowledge_documents_source on knowledge_documents(source, account);
+  create virtual table if not exists knowledge_passages_fts using fts5(
+    title, text, content='knowledge_passages', content_rowid='rowid'
+  );
+  create trigger if not exists knowledge_passages_ai after insert on knowledge_passages begin
+    insert into knowledge_passages_fts(rowid, title, text) values (new.rowid, new.title, new.text);
+  end;
+  create trigger if not exists knowledge_passages_ad after delete on knowledge_passages begin
+    insert into knowledge_passages_fts(knowledge_passages_fts, rowid, title, text) values ('delete', old.rowid, old.title, old.text);
+  end;
+  create trigger if not exists knowledge_passages_au after update on knowledge_passages begin
+    insert into knowledge_passages_fts(knowledge_passages_fts, rowid, title, text) values ('delete', old.rowid, old.title, old.text);
+    insert into knowledge_passages_fts(rowid, title, text) values (new.rowid, new.title, new.text);
+  end;
+  create table if not exists knowledge_index_lock (
+    id integer primary key check(id = 1),
+    owner text not null,
+    expires_at integer not null
+  );
+
+  create table if not exists saved_resources (
+    source text not null,
+    account text not null,
+    external_id text not null,
+    url text not null,
+    title text not null,
+    author text not null,
+    text text not null,
+    saved_at text not null,
+    fetched_at text not null,
+    metadata_json text not null default '{}',
+    content_hash text not null,
+    primary key (source, account, external_id)
+  );
+  create virtual table if not exists saved_resources_fts using fts5(
+    source unindexed, account unindexed, external_id unindexed,
+    title, author, text, content='saved_resources',
+    content_rowid='rowid'
+  );
+  create trigger if not exists saved_resources_ai after insert on saved_resources begin
+    insert into saved_resources_fts(rowid, source, account, external_id, title, author, text)
+    values (new.rowid, new.source, new.account, new.external_id, new.title, new.author, new.text);
+  end;
+  create trigger if not exists saved_resources_ad after delete on saved_resources begin
+    insert into saved_resources_fts(saved_resources_fts, rowid, source, account, external_id, title, author, text)
+    values ('delete', old.rowid, old.source, old.account, old.external_id, old.title, old.author, old.text);
+  end;
+  create trigger if not exists saved_resources_au after update on saved_resources begin
+    insert into saved_resources_fts(saved_resources_fts, rowid, source, account, external_id, title, author, text)
+    values ('delete', old.rowid, old.source, old.account, old.external_id, old.title, old.author, old.text);
+    insert into saved_resources_fts(rowid, source, account, external_id, title, author, text)
+    values (new.rowid, new.source, new.account, new.external_id, new.title, new.author, new.text);
+  end;
 
   create table if not exists profiles (
     id text primary key,

@@ -1,8 +1,14 @@
 // @vitest-environment node
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	chmodSync,
+	mkdirSync,
+	mkdtempSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	ensureBirdclawDirs,
 	getBirdCommand,
@@ -18,9 +24,12 @@ const tempRoots: string[] = [];
 const originalPath = process.env.PATH;
 
 afterEach(() => {
+	vi.restoreAllMocks();
 	resetBirdclawPathsForTests();
 	process.env.PATH = originalPath;
 	delete process.env.BIRDCLAW_HOME;
+	delete process.env.NALANDA_HOME;
+	delete process.env.NALANDA_CONFIG;
 	delete process.env.BIRDCLAW_CONFIG;
 	delete process.env.BIRDCLAW_ACTIONS_TRANSPORT;
 	delete process.env.BIRDCLAW_BIRD_COMMAND;
@@ -32,6 +41,50 @@ afterEach(() => {
 });
 
 describe("config", () => {
+	it("keeps the legacy database when an empty Nalanda directory also exists", () => {
+		const tempRoot = mkdtempSync(path.join(os.tmpdir(), "nalanda-migration-"));
+		tempRoots.push(tempRoot);
+		vi.spyOn(os, "homedir").mockReturnValue(tempRoot);
+		mkdirSync(path.join(tempRoot, ".nalanda"));
+		mkdirSync(path.join(tempRoot, ".birdclaw"));
+		writeFileSync(path.join(tempRoot, ".birdclaw", "birdclaw.sqlite"), "");
+		expect(getBirdclawPaths().dbPath).toBe(
+			path.join(tempRoot, ".birdclaw", "birdclaw.sqlite"),
+		);
+	});
+
+	it("uses NALANDA_HOME and the new database filename for a fresh library", () => {
+		const tempRoot = mkdtempSync(path.join(os.tmpdir(), "nalanda-config-"));
+		tempRoots.push(tempRoot);
+		process.env.NALANDA_HOME = tempRoot;
+		process.env.BIRDCLAW_HOME = path.join(tempRoot, "legacy-override");
+		const paths = getBirdclawPaths();
+		expect(paths.rootDir).toBe(tempRoot);
+		expect(paths.dbPath).toBe(path.join(tempRoot, "nalanda.sqlite"));
+	});
+
+	it("reuses an existing Birdclaw database inside NALANDA_HOME", () => {
+		const tempRoot = mkdtempSync(path.join(os.tmpdir(), "nalanda-config-"));
+		tempRoots.push(tempRoot);
+		process.env.NALANDA_HOME = tempRoot;
+		writeFileSync(path.join(tempRoot, "birdclaw.sqlite"), "");
+		expect(getBirdclawPaths().dbPath).toBe(
+			path.join(tempRoot, "birdclaw.sqlite"),
+		);
+	});
+
+	it("uses NALANDA_CONFIG before the legacy config override", () => {
+		const tempRoot = mkdtempSync(path.join(os.tmpdir(), "nalanda-config-"));
+		tempRoots.push(tempRoot);
+		process.env.NALANDA_CONFIG = path.join(tempRoot, "config.json");
+		process.env.BIRDCLAW_CONFIG = path.join(tempRoot, "unused.json");
+		writeFileSync(
+			process.env.NALANDA_CONFIG,
+			JSON.stringify({ bookmarks: { mode: "playwright" } }),
+		);
+		expect(getBirdclawConfig()).toEqual({ bookmarks: { mode: "playwright" } });
+	});
+
 	it("uses BIRDCLAW_HOME when set", () => {
 		const tempRoot = mkdtempSync(path.join(os.tmpdir(), "birdclaw-config-"));
 		tempRoots.push(tempRoot);

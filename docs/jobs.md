@@ -31,8 +31,12 @@ The default interval is 1,800 seconds (30 minutes). Use `--steps timeline,mentio
 
 ## `jobs sync-bookmarks`
 
+Bookmarks default to Chrome/Playwright. Chrome must be installed, signed into
+X, and have any required Keychain access already granted. Run this in a graphical
+user session; see [Bookmarks](bookmarks.md) for the full workflow.
+
 ```bash
-birdclaw --json jobs sync-bookmarks --mode auto --limit 100 --max-pages 5 --refresh
+birdclaw --json jobs sync-bookmarks --mode playwright --limit 100 --max-pages 5 --refresh
 ```
 
 What it does:
@@ -93,7 +97,7 @@ Flags:
 
 When `bird` is the active transport for bookmarks, it usually needs `AUTH_TOKEN` and `CT0` cookies that come from a logged-in browser session. launchd does not see your interactive shell environment, so the scheduled process will fail unless you provide them.
 
-The recommended pattern:
+For the explicit legacy `bird` transport, use this pattern:
 
 ```bash
 mkdir -p ~/.config/bird
@@ -105,6 +109,7 @@ SH
 chmod 600 ~/.config/bird/env.sh
 
 birdclaw --json jobs install-bookmarks-launchd \
+  --mode bird \
   --program /opt/homebrew/bin/birdclaw \
   --env-path ~/.config/bird/env.sh
 ```
@@ -139,7 +144,7 @@ Linux is not yet a first-class target for `jobs install-*`. For now, run `jobs s
 Example crontab:
 
 ```text
-0 */3 * * * /usr/local/bin/birdclaw --json jobs sync-bookmarks --mode auto --max-pages 5 --refresh >> ~/.birdclaw/logs/cron.log 2>&1
+0 */3 * * * /usr/local/bin/birdclaw --json jobs sync-bookmarks --mode playwright --max-pages 5 --refresh >> ~/.birdclaw/logs/cron.log 2>&1
 ```
 
 ## See also

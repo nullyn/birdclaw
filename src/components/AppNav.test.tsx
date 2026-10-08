@@ -99,7 +99,7 @@ describe("AppNav", () => {
 		expect(screen.getByRole("link", { name: "DMs" })).toHaveClass(
 			"justify-center",
 		);
-		expect(screen.getByText("birdclaw").parentElement).toHaveClass("sr-only");
+		expect(screen.getByText("nalanda").parentElement).toHaveClass("sr-only");
 		expect(screen.getByText("DMs")).toHaveClass("sr-only");
 	});
 });

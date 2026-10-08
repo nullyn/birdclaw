@@ -476,6 +476,15 @@ function getExportRowSets(db: Database) {
         `,
 			),
 		},
+		{
+			logicalName: "saved_resources",
+			rows: rowsForQuery(
+				db,
+				`select source, account, external_id, url, title, author, text,
+          saved_at, fetched_at, metadata_json, content_hash
+        from saved_resources order by source, account, saved_at, external_id`,
+			),
+		},
 	];
 	return rowSets;
 }
@@ -513,6 +522,9 @@ function buildShards(db: Database) {
 				break;
 			case "profile_bio_entities":
 				addRows(shards, "data/profile_bio_entities.jsonl", rowSet.rows);
+				break;
+			case "saved_resources":
+				addRows(shards, "data/saved_resources.jsonl", rowSet.rows);
 				break;
 			case "tweets":
 				for (const row of rowSet.rows) {
@@ -779,6 +791,7 @@ data/follow_snapshots.jsonl
 data/follow_snapshot_members.jsonl
 data/follow_edges.jsonl
 data/follow_events.jsonl
+data/saved_resources.jsonl
 \`\`\`
 
 Tweets are sharded by creation year. Collection-only tweets whose creation date is unknown live in \`data/tweets/unknown.jsonl\`. Timeline edges keep account-scoped home/mention membership separate from canonical tweet content. DMs are sharded by year and keep \`conversation_id\` in each row.
@@ -1321,6 +1334,7 @@ function readBackupImportRowsEffect(
 			readRows((file) => file === "data/follow_snapshot_members.jsonl"),
 			readRows((file) => file === "data/follow_edges.jsonl"),
 			readRows((file) => file === "data/follow_events.jsonl"),
+			readRows((file) => file === "data/saved_resources.jsonl"),
 		],
 		{ concurrency: "unbounded" },
 	);
@@ -1463,6 +1477,7 @@ function insertFtsRows(
 
 function clearBackupImportData(db: Database) {
 	db.exec(`
+    delete from saved_resources;
     delete from follow_events;
     delete from follow_edges;
     delete from follow_snapshot_members;
@@ -1531,6 +1546,7 @@ export function importBackupEffect({
 			followSnapshotMembers,
 			followEdges,
 			followEvents,
+			savedResources,
 		] = yield* readBackupImportRowsEffect(resolvedRepoPath, manifest);
 		const sanitizedTweets = yield* trySync(() =>
 			sanitizeImportedTweets(tweets),
@@ -1840,6 +1856,33 @@ export function importBackupEffect({
 						"kind",
 						"event_at",
 						"snapshot_id",
+					],
+				);
+				insertRows(
+					db,
+					`insert into saved_resources (
+        source, account, external_id, url, title, author, text, saved_at,
+        fetched_at, metadata_json, content_hash
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      on conflict(source, account, external_id) do update set
+        url = excluded.url, title = excluded.title, author = excluded.author,
+        text = excluded.text, saved_at = excluded.saved_at,
+        fetched_at = excluded.fetched_at, metadata_json = excluded.metadata_json,
+        content_hash = excluded.content_hash
+      where julianday(excluded.fetched_at) > julianday(saved_resources.fetched_at)`,
+					savedResources,
+					[
+						"source",
+						"account",
+						"external_id",
+						"url",
+						"title",
+						"author",
+						"text",
+						"saved_at",
+						"fetched_at",
+						"metadata_json",
+						"content_hash",
 					],
 				);
 				insertRows(

@@ -11,7 +11,7 @@ Five minutes from a clean machine to a local SQLite store full of your tweets, D
 
 ```bash
 brew install steipete/tap/birdclaw
-birdclaw --version
+nalanda --version
 ```
 
 Other install options (npm, source) are on [Install](install.md).
@@ -19,9 +19,9 @@ Other install options (npm, source) are on [Install](install.md).
 ## 2. Initialize local state
 
 ```bash
-birdclaw init
-birdclaw auth status --json
-birdclaw db stats --json
+nalanda init
+nalanda auth status --json
+nalanda db stats --json
 ```
 
 `init` creates `~/.birdclaw/`, opens the shared SQLite database, writes a default config when none exists, and probes for `xurl` and `bird` on `PATH`.
@@ -33,23 +33,23 @@ birdclaw db stats --json
 If you downloaded your Twitter/X archive from <https://x.com/settings/your_archive>, point birdclaw at it. On macOS, autodiscovery looks in `~/Downloads` and Spotlight first.
 
 ```bash
-birdclaw archive find --json
-birdclaw import archive --json
+nalanda archive find --json
+nalanda import archive --json
 # or with an explicit path:
-birdclaw import archive ~/Downloads/twitter-archive-2025.zip --json
+nalanda import archive ~/Downloads/twitter-archive-2025.zip --json
 ```
 
 Optional profile hydration fills bios, follower counts, and avatars from live Twitter metadata using whichever transport is available. It can perform hundreds or thousands of live profile reads on large archives, so run it only when you are ready to spend those X API reads:
 
 ```bash
-birdclaw import hydrate-profiles --json
+nalanda import hydrate-profiles --json
 ```
 
 Later, when you download a newer archive, you can refresh only one stale slice without wiping live-synced or local data:
 
 ```bash
-birdclaw import archive ~/Downloads/twitter-archive-2026.zip --select likes,bookmarks --json
-birdclaw import archive ~/Downloads/twitter-archive-2026.zip --select directMessages --json
+nalanda import archive ~/Downloads/twitter-archive-2026.zip --select likes,bookmarks --json
+nalanda import archive ~/Downloads/twitter-archive-2026.zip --select directMessages --json
 ```
 
 Valid slices: `tweets`, `likes`, `bookmarks`, `profiles`, `directMessages`, `followers`, `following`. Use `dms` as a short alias for `directMessages`.
@@ -61,10 +61,10 @@ No archive yet? Skip to step 4 — birdclaw is fully usable in live-only mode.
 `auto` tries `xurl` first, then falls back to `bird`. Use `bird` directly for surfaces where the API path is rate-limited.
 
 ```bash
-birdclaw sync likes --mode auto --limit 100 --refresh --json
-birdclaw sync bookmarks --mode auto --limit 100 --refresh --json
-birdclaw sync timeline --limit 100 --refresh --json
-birdclaw sync mention-threads --limit 30 --delay-ms 1500 --json
+nalanda sync likes --mode auto --limit 100 --refresh --json
+nalanda sync bookmarks --mode playwright --limit 100 --refresh --json
+nalanda sync timeline --limit 100 --refresh --json
+nalanda sync mention-threads --limit 30 --delay-ms 1500 --json
 ```
 
 Without `xurl` or `bird`, sync stays in archive-only mode and just verifies the local cache.
@@ -72,7 +72,7 @@ Without `xurl` or `bird`, sync stays in archive-only mode and just verifies the 
 ## 5. Start the web app
 
 ```bash
-birdclaw serve
+nalanda serve
 ```
 
 Open <http://localhost:3000>. The default lanes:
@@ -91,30 +91,30 @@ Use the Sync button in Home, Mentions, Likes, Bookmarks, or DMs when you want fr
 Search every tweet you ever liked or bookmarked:
 
 ```bash
-birdclaw search tweets "local-first" --json
-birdclaw search tweets --liked --hide-low-quality --limit 20 --json
-birdclaw search tweets --since 2020-01-01 --until 2021-01-01 --originals-only --limit 500 --json
+nalanda search tweets "local-first" --json
+nalanda search tweets --liked --hide-low-quality --limit 20 --json
+nalanda search tweets --since 2020-01-01 --until 2021-01-01 --originals-only --limit 500 --json
 ```
 
 Triage mentions for an agent:
 
 ```bash
-birdclaw mentions export "agent" --unreplied --limit 10
-birdclaw inbox --score --hide-low-signal --limit 8 --json
+nalanda mentions export "agent" --unreplied --limit 10
+nalanda inbox --score --hide-low-signal --limit 8 --json
 ```
 
 Bulk-block a list of obvious AI/spam accounts:
 
 ```bash
-birdclaw blocks import ~/triage/blocklist.txt --account acct_primary --json
+nalanda blocks import ~/triage/blocklist.txt --account acct_primary --json
 ```
 
 Reply from the CLI:
 
 ```bash
-birdclaw compose post "Ship local software."
-birdclaw compose reply 1891234567890 "On it."
-birdclaw compose dm dm_003 "Send it over."
+nalanda compose post "Ship local software."
+nalanda compose reply 1891234567890 "On it."
+nalanda compose dm dm_003 "Send it over."
 ```
 
 ## 7. Back up locally
@@ -122,7 +122,7 @@ birdclaw compose dm dm_003 "Send it over."
 `backup export` writes deterministic JSONL shards that round-trip back into SQLite. Push them to a private Git repo:
 
 ```bash
-birdclaw backup sync \
+nalanda backup sync \
   --repo ~/Projects/backup-birdclaw \
   --remote https://github.com/steipete/backup-birdclaw.git \
   --json

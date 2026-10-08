@@ -249,7 +249,12 @@ function syncSavedCollection(
 		const result = yield* syncTimelineCollectionEffect({
 			kind,
 			account,
-			mode: isNonDefaultAccount ? "xurl" : "auto",
+			mode:
+				kind === "bookmarks"
+					? undefined
+					: isNonDefaultAccount
+						? "xurl"
+						: "auto",
 			limit: 100,
 			maxPages: 5,
 			refresh: true,
@@ -261,6 +266,7 @@ function syncSavedCollection(
 				label: kind === "likes" ? "Likes" : "Bookmarks",
 				count: readNumber(result, "count"),
 				source: readString(result, "source"),
+				partial: readBoolean(result, "partial"),
 			},
 		];
 	});

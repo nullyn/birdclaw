@@ -69,7 +69,7 @@ describe("root route", () => {
 			meta: expect.arrayContaining([
 				expect.objectContaining({ charSet: "utf-8" }),
 				expect.objectContaining({ name: "viewport" }),
-				expect.objectContaining({ title: "birdclaw" }),
+				expect.objectContaining({ title: "nalanda" }),
 			]),
 			links: expect.arrayContaining([
 				expect.objectContaining({ rel: "stylesheet" }),

@@ -1,15 +1,16 @@
 {
-	"name": "birdclaw",
+	"name": "nalanda",
 	"version": "0.7.0",
-	"description": "Local Twitter memory in SQLite for archives, DMs, likes, bookmarks, and moderation",
-	"homepage": "https://github.com/steipete/birdclaw#readme",
+	"description": "Local saved knowledge in SQLite: X bookmarks, Instagram collections, and GitHub stars",
+	"homepage": "https://github.com/nullyn/birdclaw#readme",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/steipete/birdclaw.git"
+		"url": "git+https://github.com/nullyn/birdclaw.git"
 	},
 	"bin": {
-		"birdclaw": "bin/birdclaw.mjs"
+		"birdclaw": "bin/birdclaw.mjs",
+		"nalanda": "bin/nalanda.mjs"
 	},
 	"files": [
 		"bin/",
@@ -26,7 +27,9 @@
 		"playwright.config.ts",
 		"pnpm-lock.yaml",
 		"tsconfig.json",
-		"vite.config.ts"
+		"vite.config.ts",
+		"docs/nalanda.md",
+		"docs/bookmarks.md"
 	],
 	"type": "module",
 	"imports": {
@@ -61,12 +64,14 @@
 		"@tanstack/react-router-ssr-query": "1.166.12",
 		"@tanstack/react-start": "1.167.65",
 		"@tanstack/router-plugin": "^1.167.35",
+		"@typesafe-ai/sdk": "^0.6.0",
 		"@vitejs/plugin-react": "^6.0.1",
 		"commander": "^14.0.3",
 		"effect": "^3.21.2",
 		"kysely": "^0.29.0",
 		"lucide-react": "^1.16.0",
 		"mapbox-gl": "^3.24.0",
+		"playwright": "^1.63.0",
 		"react": "^19.2.6",
 		"react-dom": "^19.2.6",
 		"react-map-gl": "^8.1.1",
@@ -77,7 +82,7 @@
 		"zod": "^4.4.3"
 	},
 	"devDependencies": {
-		"@playwright/test": "^1.60.0",
+		"@playwright/test": "^1.63.0",
 		"@tailwindcss/typography": "^0.5.19",
 		"@testing-library/dom": "^10.4.1",
 		"@testing-library/jest-dom": "^6.9.1",
@@ -98,11 +103,5 @@
 	"engines": {
 		"node": ">=25.8.1 <27"
 	},
-	"packageManager": "pnpm@10.31.0",
-	"pnpm": {
-		"onlyBuiltDependencies": [
-			"esbuild",
-			"lightningcss"
-		]
-	}
+	"packageManager": "pnpm@10.31.0"
 }

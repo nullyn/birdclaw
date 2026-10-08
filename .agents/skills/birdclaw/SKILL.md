@@ -7,6 +7,32 @@ description: "X/Twitter archive search: yearly vibes, odd tweets, quality filter
 
 Use this for X/Twitter archive questions before web/API lookup. Local archive first; live X only when explicitly needed for current account state.
 
+## Nalanda saved knowledge
+
+For questions about saved X bookmarks, the Instagram AI collection, or starred
+GitHub repositories, use unified local retrieval before live web lookup:
+
+```bash
+nalanda --json search knowledge "<question>"
+nalanda --json search knowledge "<question>" --source github --account alice --no-rerank
+```
+
+If the executable is not linked, run `pnpm cli --json ...` in this source checkout
+with Node 26. First-time setup requires Ollama and `ollama pull embeddinggemma-2`,
+then `nalanda --json index knowledge`. After source sync, rerun indexing or search
+with `--refresh-index`. Indexing reads local captured content and is resumable;
+search does not fetch remote content. `--no-rerank` uses only local retrieval and
+avoids JEV requests. Default reranking sends a bounded evidence shortlist to JEV.
+
+Read `stats.indexIncomplete`, warnings, relevance scores, and timestamps before
+answering. Cite returned URLs and ground claims in returned passage text. Do not
+present a nearest neighbor as proof, or claim remote collection completeness from
+local index coverage. Use configured account IDs: X uses IDs such as
+`acct_alice`; GitHub and Instagram use their account usernames. The examples
+use `alice`; substitute the account that owns the captured records. Use the original X commands below for archive/DM queries; unified
+knowledge retrieval indexes bookmarked X content only. Instagram video speech
+summaries and OCR are not available yet.
+
 ## Data
 
 Prefer:

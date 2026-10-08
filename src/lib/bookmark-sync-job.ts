@@ -9,7 +9,11 @@ import {
 	maybeAutoSyncBackupEffect,
 	type BackupAutoUpdateResult,
 } from "./backup";
-import { ensureBirdclawDirs, getBirdclawPaths } from "./config";
+import {
+	ensureBirdclawDirs,
+	getBirdclawPaths,
+	getBirdclawConfig,
+} from "./config";
 import { getNativeDb } from "./db";
 import { runEffectPromise, tryPromise } from "./effect-runtime";
 import {
@@ -222,7 +226,7 @@ function acquireLockEffect(
 
 export function runBookmarkSyncJobEffect({
 	account,
-	mode = "auto",
+	mode = getBirdclawConfig().bookmarks?.mode ?? "playwright",
 	limit = DEFAULT_BOOKMARK_SYNC_LIMIT,
 	all,
 	maxPages = DEFAULT_BOOKMARK_SYNC_MAX_PAGES,
@@ -371,7 +375,7 @@ function shellQuote(value: string) {
 
 function buildProgramArguments({
 	program = "birdclaw",
-	mode = "auto",
+	mode = getBirdclawConfig().bookmarks?.mode ?? "playwright",
 	limit = DEFAULT_BOOKMARK_SYNC_LIMIT,
 	all = false,
 	maxPages = DEFAULT_BOOKMARK_SYNC_MAX_PAGES,

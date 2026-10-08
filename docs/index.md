@@ -1,8 +1,10 @@
 ---
 title: Overview
 permalink: /
-description: "birdclaw is a local-first Twitter workspace: archive import, cached live reads, focused triage, and reply flows in one local web app + CLI."
+description: "Nalanda is a local saved knowledge library for agents, backed by SQLite."
 ---
+
+See [Nalanda](nalanda.md) for the agent interface, source imports, and retrieval status.
 
 ## Try it
 
@@ -10,30 +12,30 @@ After [installing](install.md) and running [`birdclaw init`](quickstart.md), eve
 
 ```bash
 # Find and import your Twitter archive (auto-discovered on macOS).
-birdclaw archive find --json
-birdclaw import archive --json
-birdclaw import archive ~/Downloads/twitter-archive.zip --select likes,bookmarks --json
+nalanda archive find --json
+nalanda import archive --json
+nalanda import archive ~/Downloads/twitter-archive.zip --select likes,bookmarks --json
 
 # Pull in mentions, likes, bookmarks, and the home timeline.
-birdclaw sync timeline --limit 100 --refresh --json
-birdclaw sync bookmarks --mode auto --all --json
+nalanda sync timeline --limit 100 --refresh --json
+nalanda sync bookmarks --mode playwright --all --json
 
 # Search every tweet you've ever liked, locally, with FTS5.
-birdclaw search tweets "local-first" --json
-birdclaw search tweets --bookmarked --hide-low-quality --limit 100 --json
+nalanda search tweets "local-first" --json
+nalanda search tweets --bookmarked --hide-low-quality --limit 100 --json
 
 # Triage with AI ranking and reply from the CLI.
-birdclaw inbox --score --hide-low-signal --limit 8 --json
-birdclaw compose reply 1891234567890 "On it."
+nalanda inbox --score --hide-low-signal --limit 8 --json
+nalanda compose reply 1891234567890 "On it."
 
 # Stream a local "what happened" digest.
-birdclaw today
-birdclaw digest week --json
+nalanda today
+nalanda digest week --json
 ```
 
 Stable `--json` envelopes go to stdout, progress and warnings to stderr — pipes stay parseable.
 
-## What birdclaw does
+## What Nalanda does
 
 - **One local SQLite database** for tweets, DMs, likes, bookmarks, mentions, follows, blocks, and mutes — multi-account, FTS5-indexed.
 - **Archive-first, live-aware.** Import a Twitter archive when you have one, selectively re-import stale slices with `--select`, or stay live-only. All paths converge on the same canonical tables.

@@ -19,7 +19,7 @@ Designed with `create-cli` defaults:
 ## Usage
 
 ```text
-birdclaw [global flags] <subcommand> [args]
+nalanda [global flags] <subcommand> [args]
 ```
 
 ## Global flags
@@ -59,57 +59,57 @@ Project config:
 ## Command tree
 
 ```text
-birdclaw init
-birdclaw auth status
-birdclaw auth use <transport>
-birdclaw import archive [path]
-birdclaw sync all
-birdclaw sync tweets
-birdclaw sync authored
-birdclaw sync dms
-birdclaw sync bookmarks
-birdclaw sync likes
-birdclaw sync timeline
-birdclaw sync mentions
-birdclaw sync mention-threads
-birdclaw sync followers
-birdclaw sync following
-birdclaw search tweets <query>
-birdclaw search dms <query>
-birdclaw discuss <query>
-birdclaw today
-birdclaw digest [today|24h|yesterday|week]
-birdclaw mentions export [query]
-birdclaw media fetch
-birdclaw dms list
-birdclaw mute <handle-or-id>
-birdclaw unmute <handle-or-id>
-birdclaw mutes list
-birdclaw blocks list
-birdclaw blocks add <handle-or-id>
-birdclaw blocks remove <handle-or-id>
-birdclaw ban <handle-or-id>
-birdclaw unban <handle-or-id>
-birdclaw show tweet <id>
-birdclaw show thread <id>
-birdclaw show dm <conversation-id>
-birdclaw inbox
-birdclaw serve
-birdclaw graph summary
-birdclaw graph events
-birdclaw graph top-followers
-birdclaw graph unfollowed
-birdclaw graph non-mutual-following
-birdclaw graph mutuals
-birdclaw compose post
-birdclaw compose reply <tweet-id>
-birdclaw db stats
-birdclaw db vacuum
-birdclaw backup export --repo <path>
-birdclaw backup sync --repo <path> --remote <url>
-birdclaw backup import <path>
-birdclaw backup validate <path>
-birdclaw debug transport
+nalanda init
+nalanda auth status
+nalanda auth use <transport>
+nalanda import archive [path]
+nalanda sync all
+nalanda sync tweets
+nalanda sync authored
+nalanda sync dms
+nalanda sync bookmarks
+nalanda sync likes
+nalanda sync timeline
+nalanda sync mentions
+nalanda sync mention-threads
+nalanda sync followers
+nalanda sync following
+nalanda search tweets <query>
+nalanda search dms <query>
+nalanda discuss <query>
+nalanda today
+nalanda digest [today|24h|yesterday|week]
+nalanda mentions export [query]
+nalanda media fetch
+nalanda dms list
+nalanda mute <handle-or-id>
+nalanda unmute <handle-or-id>
+nalanda mutes list
+nalanda blocks list
+nalanda blocks add <handle-or-id>
+nalanda blocks remove <handle-or-id>
+nalanda ban <handle-or-id>
+nalanda unban <handle-or-id>
+nalanda show tweet <id>
+nalanda show thread <id>
+nalanda show dm <conversation-id>
+nalanda inbox
+nalanda serve
+nalanda graph summary
+nalanda graph events
+nalanda graph top-followers
+nalanda graph unfollowed
+nalanda graph non-mutual-following
+nalanda graph mutuals
+nalanda compose post
+nalanda compose reply <tweet-id>
+nalanda db stats
+nalanda db vacuum
+nalanda backup export --repo <path>
+nalanda backup sync --repo <path> --remote <url>
+nalanda backup import <path>
+nalanda backup validate <path>
+nalanda debug transport
 ```
 
 ## Subcommand semantics
@@ -157,7 +157,7 @@ birdclaw debug transport
 - `--push` implies commit and pushes the backup repo
 
 ```bash
-birdclaw backup export --repo ~/Projects/birdclaw-store --commit --push
+nalanda backup export --repo ~/Projects/birdclaw-store --commit --push
 ```
 
 ### `backup sync`
@@ -169,7 +169,7 @@ birdclaw backup export --repo ~/Projects/birdclaw-store --commit --push
 - commits and pushes the backup repo
 
 ```bash
-birdclaw backup sync --repo ~/Projects/backup-birdclaw --remote https://github.com/steipete/backup-birdclaw.git --json
+nalanda backup sync --repo ~/Projects/backup-birdclaw --remote https://github.com/steipete/backup-birdclaw.git --json
 ```
 
 Shard contract:
@@ -220,7 +220,7 @@ by default. Override it with `BIRDCLAW_BIRD_COMMAND` or:
 - rebuilds tweet and DM FTS from the JSONL text
 
 ```bash
-birdclaw backup import ~/Projects/birdclaw-store --json
+nalanda backup import ~/Projects/birdclaw-store --json
 ```
 
 ### `backup validate`
@@ -230,7 +230,7 @@ birdclaw backup import ~/Projects/birdclaw-store --json
 - exits non-zero on validation failure
 
 ```bash
-birdclaw backup validate ~/Projects/birdclaw-store --json
+nalanda backup validate ~/Projects/birdclaw-store --json
 ```
 
 ### `import archive [path]`
@@ -260,12 +260,12 @@ Flags:
 Examples:
 
 ```bash
-birdclaw import archive --json
-birdclaw import archive ~/Downloads/twitter-archive.zip --json
-birdclaw import archive ~/Downloads/twitter-archive.zip --select tweets --json
-birdclaw import archive ~/Downloads/twitter-archive.zip --select likes,bookmarks --json
-birdclaw import archive ~/Downloads/twitter-archive.zip --select dms --json
-birdclaw import archive ~/Downloads/twitter-archive.zip --select followers,following --json
+nalanda import archive --json
+nalanda import archive ~/Downloads/twitter-archive.zip --json
+nalanda import archive ~/Downloads/twitter-archive.zip --select tweets --json
+nalanda import archive ~/Downloads/twitter-archive.zip --select likes,bookmarks --json
+nalanda import archive ~/Downloads/twitter-archive.zip --select dms --json
+nalanda import archive ~/Downloads/twitter-archive.zip --select followers,following --json
 ```
 
 ### `sync *`
@@ -290,6 +290,7 @@ Common flags:
 - `--mode auto|xurl|bird`
 - `--all`
 - `--max-pages <n>`
+- `--mode playwright` (bookmarks only; default bookmark transport)
 - `--early-stop` (on `sync likes` and `sync bookmarks`)
 - `--refresh`
 - `--cache-ttl <seconds>`
@@ -297,28 +298,28 @@ Common flags:
 Examples:
 
 ```bash
-birdclaw sync authored --mode xurl --limit 100 --json
-birdclaw sync likes --mode auto --limit 100 --refresh --json
-birdclaw sync likes --mode auto --limit 100 --max-pages 5 --early-stop --refresh --json
-birdclaw sync bookmarks --mode auto --limit 100 --refresh --json
-birdclaw sync bookmarks --mode auto --limit 100 --max-pages 5 --early-stop --refresh --json
-birdclaw sync bookmarks --mode bird --all --max-pages 5 --limit 100 --refresh --json
-birdclaw sync timeline --limit 100 --refresh --json
-birdclaw sync mentions --mode xurl --limit 100 --max-pages 3 --refresh --json
-birdclaw sync mention-threads --mode bird --limit 30 --delay-ms 1500 --timeout-ms 15000 --json
-birdclaw sync mention-threads --mode xurl --limit 30 --json
+nalanda sync authored --mode xurl --limit 100 --json
+nalanda sync likes --mode auto --limit 100 --refresh --json
+nalanda sync likes --mode auto --limit 100 --max-pages 5 --early-stop --refresh --json
+nalanda sync bookmarks --mode playwright --limit 100 --refresh --json
+nalanda sync bookmarks --mode playwright --limit 100 --max-pages 5 --early-stop --refresh --json
+nalanda sync bookmarks --mode bird --all --max-pages 5 --limit 100 --refresh --json
+nalanda sync timeline --limit 100 --refresh --json
+nalanda sync mentions --mode xurl --limit 100 --max-pages 3 --refresh --json
+nalanda sync mention-threads --mode bird --limit 30 --delay-ms 1500 --timeout-ms 15000 --json
+nalanda sync mention-threads --mode xurl --limit 30 --json
 ```
 
 Follow graph examples:
 
 ```bash
-birdclaw sync followers --json
-birdclaw sync following --json
-birdclaw sync followers --yes --json
-birdclaw sync following --yes --json
-birdclaw sync followers --mode bird --yes --json
-birdclaw sync followers --yes --max-pages 1 --allow-partial --json
-birdclaw sync followers --yes --refresh --json
+nalanda sync followers --json
+nalanda sync following --json
+nalanda sync followers --yes --json
+nalanda sync following --yes --json
+nalanda sync followers --mode bird --yes --json
+nalanda sync followers --yes --max-pages 1 --allow-partial --json
+nalanda sync followers --yes --refresh --json
 ```
 
 Follow graph sync uses a 24-hour cache by default. Repeating the same sync command with `--yes` reuses fresh cache unless `--refresh` is passed, which prevents duplicate live reads during agent workflows.
@@ -337,7 +338,7 @@ Follow graph sync uses a 24-hour cache by default. Repeating the same sync comma
 Examples:
 
 ```bash
-birdclaw --json jobs sync-account --account acct_openclaw --limit 100 --max-pages 3 --refresh --allow-bird-account
+nalanda --json jobs sync-account --account acct_openclaw --limit 100 --max-pages 3 --refresh --allow-bird-account
 tail -n 20 ~/.birdclaw/audit/account-sync.jsonl | jq .
 ```
 
@@ -351,8 +352,16 @@ tail -n 20 ~/.birdclaw/audit/account-sync.jsonl | jq .
 - `--allow-bird-account` asserts those cookies match `--account` for Bird-backed timeline, mentions, and DM steps
 
 ```bash
-birdclaw --json jobs install-account-launchd --account acct_openclaw --program /opt/homebrew/bin/birdclaw --env-path ~/.config/bird/openclaw.env --allow-bird-account
+nalanda --json jobs install-account-launchd --account acct_openclaw --program /opt/homebrew/bin/birdclaw --env-path ~/.config/bird/openclaw.env --allow-bird-account
 ```
+
+### `bookmarks-analyze [query]`
+
+Tag local bookmarks with JEV and optionally rank them for a question. Supports
+`--account`, `--limit` (1–50, default 20), `--search`, and `--cached-only`.
+`--all` tags the library in resumable batches with a soft 2M input-token run
+budget; it cannot be combined with a question or search. Requires
+`TYPESAFE_API_KEY` for uncached judgments. See [Bookmarks](bookmarks.md).
 
 ### `jobs sync-bookmarks`
 
@@ -371,7 +380,7 @@ Default audit log:
 Examples:
 
 ```bash
-birdclaw --json jobs sync-bookmarks --mode auto --limit 100 --max-pages 5 --refresh
+nalanda --json jobs sync-bookmarks --mode playwright --limit 100 --max-pages 5 --refresh
 tail -n 20 ~/.birdclaw/audit/bookmarks-sync.jsonl | jq .
 ```
 
@@ -384,7 +393,7 @@ tail -n 20 ~/.birdclaw/audit/bookmarks-sync.jsonl | jq .
 - `--env-path <path>` sources an export-only shell env file inside the scheduled process, useful when `bird` needs `AUTH_TOKEN`/`CT0` outside an interactive browser session
 
 ```bash
-birdclaw --json jobs install-bookmarks-launchd --program /opt/homebrew/bin/birdclaw
+nalanda --json jobs install-bookmarks-launchd --program /opt/homebrew/bin/birdclaw
 ```
 
 ### `search tweets <query>`
@@ -403,8 +412,8 @@ Flags:
 Examples:
 
 ```bash
-birdclaw search tweets --liked --limit 20 --json
-birdclaw search tweets --bookmarked --limit 20 --json
+nalanda search tweets --liked --limit 20 --json
+nalanda search tweets --bookmarked --limit 20 --json
 ```
 
 ### `search dms <query>`
@@ -458,9 +467,9 @@ Flags:
 Examples:
 
 ```bash
-birdclaw discuss "local-first" --mode bird
-birdclaw discuss "sync engine" --question "what changed over time?"
-birdclaw discuss "prototype" --include-dms --limit 500 --max-pages 5 --json
+nalanda discuss "local-first" --mode bird
+nalanda discuss "sync engine" --question "what changed over time?"
+nalanda discuss "prototype" --include-dms --limit 500 --max-pages 5 --json
 ```
 
 ### `whois <query>`
@@ -496,10 +505,10 @@ Flags:
 Examples:
 
 ```bash
-birdclaw whois blacksmith --context 4 --no-xurl-fallback --json
-birdclaw whois "blacksmith guy" --context 4 --no-xurl-fallback --json
-birdclaw whois "github guy" --current-affiliation github --exclude-domain-only
-birdclaw whois blacksmith --tweets --no-xurl-fallback
+nalanda whois blacksmith --context 4 --no-xurl-fallback --json
+nalanda whois "blacksmith guy" --context 4 --no-xurl-fallback --json
+nalanda whois "github guy" --current-affiliation github --exclude-domain-only
+nalanda whois blacksmith --tweets --no-xurl-fallback
 ```
 
 ### `mentions export [query]`
@@ -529,12 +538,12 @@ Flags:
 Examples:
 
 ```bash
-birdclaw mentions export "agent" --unreplied --limit 10
-birdclaw mentions export --mode bird --limit 20
-birdclaw mentions export --mode xurl --limit 5
-birdclaw mentions export "codex" --mode xurl --limit 5
-birdclaw mentions export --mode xurl --refresh --cache-ttl 30 --limit 5
-birdclaw mentions export --mode xurl --refresh --all --max-pages 9 --limit 100
+nalanda mentions export "agent" --unreplied --limit 10
+nalanda mentions export --mode bird --limit 20
+nalanda mentions export --mode xurl --limit 5
+nalanda mentions export "codex" --mode xurl --limit 5
+nalanda mentions export --mode xurl --refresh --cache-ttl 30 --limit 5
+nalanda mentions export --mode xurl --refresh --all --max-pages 9 --limit 100
 ```
 
 Notes:
@@ -577,10 +586,10 @@ JSON output carries `images_fetched`, `videos_fetched`, `gifs_fetched`, `reused_
 Examples:
 
 ```bash
-birdclaw media fetch --json
-birdclaw media fetch --dry-run --limit 20
-birdclaw media fetch --include-video --video-pacing-ms 1500 --max-bytes 209715200 --json
-birdclaw media fetch --no-include-video --parallel 3 --pacing-ms 250 --json
+nalanda media fetch --json
+nalanda media fetch --dry-run --limit 20
+nalanda media fetch --include-video --video-pacing-ms 1500 --max-bytes 209715200 --json
+nalanda media fetch --no-include-video --parallel 3 --pacing-ms 250 --json
 ```
 
 ### `profiles replies <handle-or-id>`
@@ -597,7 +606,7 @@ Flags:
 Examples:
 
 ```bash
-birdclaw profiles replies @jpctan --limit 12 --json
+nalanda profiles replies @jpctan --limit 12 --json
 ```
 
 ### `dms list`
@@ -829,16 +838,53 @@ stderr:
 ## Examples
 
 ```bash
-birdclaw init
-birdclaw auth status
-birdclaw import archive ~/Downloads/twitter-archive.zip --select tweets,directMessages
-birdclaw sync all --transport xurl
-birdclaw search tweets "openai" --since 2024-01-01 --limit 20
-birdclaw search tweets --since 2020-01-01 --until 2021-01-01 --originals-only --hide-low-quality --limit 500
-birdclaw search dms "invoice" --participant @someone --min-followers 1000
-birdclaw dms list --unreplied --min-followers 500 --min-influence-score 90 --sort followers
-birdclaw inbox --json
-birdclaw serve --sync
-birdclaw graph events --json
-birdclaw compose reply 1891234567890
+nalanda init
+nalanda auth status
+nalanda import archive ~/Downloads/twitter-archive.zip --select tweets,directMessages
+nalanda sync all --transport xurl
+nalanda search tweets "openai" --since 2024-01-01 --limit 20
+nalanda search tweets --since 2020-01-01 --until 2021-01-01 --originals-only --hide-low-quality --limit 500
+nalanda search dms "invoice" --participant @someone --min-followers 1000
+nalanda dms list --unreplied --min-followers 500 --min-influence-score 90 --sort followers
+nalanda inbox --json
+nalanda serve --sync
+nalanda graph events --json
+nalanda compose reply 1891234567890
 ```
+
+## Saved sources
+
+Nalanda adds the following commands. All support the root `--json` flag.
+
+```bash
+nalanda --json sync github-stars
+nalanda --json sync instagram-saved --account alice --collection AI --max-items 500
+nalanda --json search saved "agent" --source github --limit 10
+nalanda --json saved-get github alice <external-id>
+```
+
+GitHub imports descriptions, topics, and cached READMEs through authenticated `gh`.
+Instagram reads only the named saved collection through Chrome. `search saved`
+is local keyword search over these two sources. See [Nalanda](nalanda.md) for
+partial results, storage compatibility, and the semantic retrieval design.
+
+### Unified semantic retrieval
+
+```bash
+nalanda --json index knowledge
+nalanda --json search knowledge "Ways to give an AI assistant persistent memory"
+nalanda --json search knowledge "agent memory" --source github --account alice --no-rerank
+nalanda --json search knowledge "Playwright" --mode keyword --no-rerank
+```
+
+`index knowledge` incrementally embeds captured X bookmarks, Instagram posts,
+and GitHub README passages using local Ollama (`ollama pull embeddinggemma-2`).
+Search modes are `hybrid` (default), `semantic`, and `keyword`. The default JEV
+reranking is cached and metered; `--no-rerank` makes no JEV calls. `--limit` accepts
+1–50. `--refresh-index` indexes changed local content before searching; it does
+not fetch sources. Source/account filters apply before retrieval and reranking.
+
+JSON includes evidence passages, citation URLs, text offsets, source timestamps,
+retrieval scores, JEV relevance/confidence, request/token usage, and an explicit
+`stats.indexIncomplete` flag when captured content is missing or stale in the
+index. See [Nalanda](nalanda.md) for the complete behavior and recovery workflow.

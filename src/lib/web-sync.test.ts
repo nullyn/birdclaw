@@ -241,7 +241,7 @@ describe("web sync dispatcher", () => {
 
 		expect(syncTimelineCollectionMock).toHaveBeenCalledWith({
 			kind: "bookmarks",
-			mode: "auto",
+			mode: undefined,
 			limit: 100,
 			maxPages: 5,
 			refresh: true,

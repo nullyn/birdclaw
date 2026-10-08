@@ -1,11 +1,11 @@
 ---
 title: Install
-description: "Install birdclaw via Homebrew, npm, or from source. Optional xurl and bird improve live transport coverage."
+description: "Install Nalanda from this source checkout. Optional xurl and bird improve legacy live transport coverage."
 ---
 
 # Install
 
-`birdclaw` ships as a Node CLI plus a local web app. Pick whichever path fits the machine.
+Nalanda ships as a Node CLI plus a local web app. Install this fork from source.
 
 ## Requirements
 
@@ -22,49 +22,23 @@ Optional but encouraged:
 
 birdclaw still works in pure local/archive mode without any of the above.
 
-## Homebrew (macOS, Linux)
+## Install this fork from source
+
+Nalanda is not yet published on npm or Homebrew. Use this checkout with Node 26:
 
 ```bash
-brew install steipete/tap/birdclaw
-birdclaw --version
-```
-
-The Homebrew formula lives in `steipete/homebrew-tap` and installs the `birdclaw` binary plus a launchd plist target.
-
-## npm / pnpm
-
-```bash
-pnpm add -g birdclaw
-# or
-npm install -g birdclaw
-
-birdclaw --version
-```
-
-The package is published as [`birdclaw`](https://www.npmjs.com/package/birdclaw) on npm.
-
-## From source
-
-```bash
-git clone https://github.com/steipete/birdclaw.git
-cd birdclaw
-fnm use
 pnpm install
 pnpm build
-node ./bin/birdclaw.mjs --version
+node ./bin/nalanda.mjs --version
+pnpm link --global
+nalanda --help
 ```
 
-`fnm use` reads the version from `.node-version`. Source builds run the same `tsx`-based entrypoint as the published binary.
+`birdclaw` remains a compatibility executable. To avoid a global link, use
+`pnpm cli` in the checkout. GitHub star hydration needs an authenticated `gh`
+installation; X and Instagram hydration use installed Chrome and Playwright.
 
-## Verify the install
-
-```bash
-birdclaw --version
-birdclaw auth status --json
-birdclaw db stats --json
-```
-
-`auth status` prints which transports are wired up (`archive`, `xurl`, `bird`, `xweb`) and which account is currently active.
+See [Nalanda](nalanda.md) for source scope, storage compatibility, and commands.
 
 ## Optional: xurl
 
@@ -96,23 +70,9 @@ Add it to `~/.profile` or your shell rc to persist. The inbox uses OpenAI for lo
 
 ## Updating
 
-- **Homebrew:** `brew upgrade birdclaw`.
-- **npm:** `pnpm up -g birdclaw` (or `npm i -g birdclaw@latest`).
-- **Source:** `git pull && pnpm install && pnpm build`.
+Update this checkout, then run `pnpm install` and `pnpm build`. An existing global
+link continues to point to the checkout. Keep a [backup](backup.md) of local data.
 
-The local SQLite store is forward-compatible across point releases. Long-running schema migrations run on startup; `birdclaw db stats --json` reports the current schema version.
-
-## Uninstall
-
-```bash
-# Homebrew
-brew uninstall birdclaw
-
-# npm
-pnpm rm -g birdclaw
-
-# Optional: also remove local data
-rm -rf ~/.birdclaw
-```
-
-The local data root defaults to `~/.birdclaw` (override via `BIRDCLAW_HOME`). Removing it deletes your imported archive, media cache, and live cache. Backup shards are stored separately if you set up [`backup sync`](backup.md).
+Fresh installations use `~/.nalanda`; existing `~/.birdclaw` installations are
+reused. Removing either data directory deletes the records and local caches in
+that directory.
