@@ -2,11 +2,11 @@
 	"name": "nalanda",
 	"version": "0.7.0",
 	"description": "Local saved knowledge in SQLite: X bookmarks, Instagram collections, and GitHub stars",
-	"homepage": "https://github.com/nullyn/birdclaw#readme",
+	"homepage": "https://github.com/nullyn/nalanda#readme",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/nullyn/birdclaw.git"
+		"url": "git+https://github.com/nullyn/nalanda.git"
 	},
 	"bin": {
 		"birdclaw": "bin/birdclaw.mjs",

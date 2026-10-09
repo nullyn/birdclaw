@@ -24,9 +24,11 @@ birdclaw still works in pure local/archive mode without any of the above.
 
 ## Install this fork from source
 
-Nalanda is not yet published on npm or Homebrew. Use this checkout with Node 26:
+Nalanda is not yet published on npm or Homebrew. Clone and install with Node 26:
 
 ```bash
+git clone https://github.com/nullyn/nalanda.git
+cd nalanda
 pnpm install
 pnpm build
 node ./bin/nalanda.mjs --version

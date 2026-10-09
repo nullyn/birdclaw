@@ -185,9 +185,11 @@ Notes:
 
 ## Install
 
-From this checkout (Node 26):
+Clone and install with Node 26:
 
 ```bash
+git clone https://github.com/nullyn/nalanda.git
+cd nalanda
 pnpm install
 pnpm link --global
 nalanda --help
