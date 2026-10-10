@@ -1,6 +1,10 @@
-# Nalanda — Local saved knowledge for agents
+# Nalanda — Saved knowledge for agents
 
-Nalanda is a local knowledge library built on [Birdclaw](https://github.com/steipete/birdclaw) by [@steipete](https://github.com/steipete/). Its agent interface is a JSON CLI backed by SQLite. It syncs X bookmarks, the Instagram AI collection, and GitHub stars. Unified search combines local semantic embeddings, keyword matches, and cached JEV reranking. See [the Nalanda design](docs/nalanda.md) for scope and implementation status.
+Nalanda syncs X bookmarks, the Instagram AI collection, and GitHub stars into a searchable knowledge library. The current deployment exposes an authenticated **cloud MCP**, with Cloudflare D1, keyword search and 512-dimensional EmbeddingGemma 300M semantic search. Calling agents can search, request hydration, read evidence and supply inferred tags or summaries without a separate paid inference API.
+
+**Agents: start with [the agent quick-start README](docs/agents/README.md).** For hosting and deployment, see [cloud/README.md](cloud/README.md).
+
+The repository also retains the local SQLite/JSON CLI and inherited [Birdclaw](https://github.com/steipete/birdclaw) features by [@steipete](https://github.com/steipete/). The local features described below are separate from the cloud MCP; the cloud saved-content pipeline does not store media or require a local server. See [the Nalanda design](docs/nalanda.md) for local implementation details.
 
 Status: WIP. Real and usable. Not done. Expect schema churn, transport gaps, and rough edges while the core settles.
 
