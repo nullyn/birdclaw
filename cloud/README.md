@@ -11,9 +11,11 @@ all three sources return results with no pending imports or embeddings. Consult
 `nalanda_status` for current coverage. The existing CLI archive
 remains intact. Cloud Chromium previously synced X and Instagram to that archive;
 Worker-based X hydration is deferred after the account's free browser allowance
-was consumed during testing. Instagram refresh is paused and its cloud session
-removed following an account security alert; captured Instagram content remains
-searchable. A renewed session is required before refresh can resume.
+was consumed during testing. Following an Instagram account security alert, the
+old cloud session was removed and replaced after the user signed in again locally.
+Instagram refresh is configured again, with a bounded validation job queued;
+successful Worker-based Instagram fetching remains unverified. Captured Instagram
+content remains searchable.
 
 Cloud embeddings use `@cf/google/embeddinggemma-300m`: the Gemma 3-based model,
 reduced to 512 dimensions and normalized. Existing local EmbeddingGemma 2 vectors
