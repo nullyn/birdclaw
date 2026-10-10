@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nalanda",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": false },
+  "ai": { "binding": "AI" },
+  "browser": { "binding": "BROWSER" },
+  "d1_databases": [{ "binding": "DB", "database_name": "nalanda", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }],
+  "vectorize": [{ "binding": "VECTORS", "index_name": "nalanda-embeddinggemma-512" }],
+  "queues": {
+    "producers": [{ "binding": "JOBS", "queue": "nalanda-jobs" }],
+    "consumers": [{ "queue": "nalanda-jobs", "max_batch_size": 1, "max_batch_timeout": 0, "max_concurrency": 1, "max_retries": 2, "retry_delay": 60 }]
+  },
+  "triggers": { "crons": ["15 1 * * *", "*/10 * * * *"] },
+  "vars": { "X_ACCOUNT": "", "INSTAGRAM_ACCOUNT": "", "INSTAGRAM_COLLECTION": "AI", "GITHUB_ACCOUNT": "", "MAX_BROWSER_LAUNCHES_PER_DAY": "6" }
+}

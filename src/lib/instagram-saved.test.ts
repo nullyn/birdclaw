@@ -23,6 +23,8 @@ import {
 function makeBrowserHarness(
 	options: {
 		profileHref?: string;
+		navigationProfileHref?: string;
+		navigationProfileInsideMain?: boolean;
 		collectionText?: string;
 		postHref?: string;
 		caption?: string;
@@ -113,6 +115,21 @@ function makeBrowserHarness(
 		return {
 			goto: vi.fn(async () => {}),
 			getByRole: (_role: string, roleOptions: { name: string }) => {
+				if (roleOptions.name === "Profile" && options.navigationProfileHref) {
+					const profile = {
+						waitFor: async () => {},
+						isVisible: async () => true,
+						evaluate: async () => ({
+							href: options.navigationProfileHref,
+							outsideMain: !options.navigationProfileInsideMain,
+						}),
+					};
+					return {
+						first: () => profile,
+						nth: () => profile,
+						count: async () => 1,
+					};
+				}
 				const link = locator('a[href*="/saved/"]');
 				return {
 					first: () => link,
@@ -194,6 +211,26 @@ describe("Instagram standalone post DOM", () => {
 });
 
 describe("syncInstagramCollection", () => {
+	it("uses the signed-in navigation account when profile images are unavailable", async () => {
+		makeBrowserHarness({
+			navigationProfileHref: "/alice/",
+			profileHref: "/another-account/",
+			postHref: "https://www.instagram.com/100xengineers/reel/DeExZDCJJNj/",
+		});
+		await expect(
+			syncInstagramCollection({ username: "alice", maxItems: 1 }),
+		).resolves.toBeDefined();
+	});
+	it("rejects a mismatched navigation account even if a post links to the expected profile", async () => {
+		makeBrowserHarness({
+			navigationProfileHref: "/another-account/",
+			profileHref: "/alice/",
+		});
+		await expect(
+			syncInstagramCollection({ username: "alice", maxItems: 1 }),
+		).rejects.toThrow(/signed in to a different Instagram account/);
+		expect(mocks.upsert).not.toHaveBeenCalled();
+	});
 	it("preserves full captured evidence when a refresh only returns a preview", async () => {
 		makeBrowserHarness({
 			postHref: "/100xengineers/reel/DeExZDCJJNj/",

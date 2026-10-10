@@ -196,10 +196,17 @@ is needed to rebuild saved text. SQLite remains the durable store; Postgres and
 MCP are not required.
 
 The existing X bookmark UI and `search saved` keyword command still work.
-Unified semantic retrieval is currently CLI-only. X's incremental refresh walks
+The local CLI provides unified semantic retrieval. A remote MCP implementation
+is now available in [cloud/README.md](../cloud/README.md), with D1, Vectorize,
+Cloudflare's 512-dimensional EmbeddingGemma 300M and bounded queued hydration.
+It is deployed at `https://nalanda.nullyn.workers.dev/mcp`; authentication, GitHub
+hydration and hosted retrieval are verified. Archive migration has completed;
+the local archive remains available until coverage is verified. X's incremental refresh walks
 newest bookmarks until a fully known page; tweet publication dates cannot identify
 newly saved old posts. Durable remote-source checkpoints and coordination between
-multiple remote hydration requests remain future work.
+multiple remote hydration requests are implemented in the cloud service; they
+have tests, but complete Worker browser hydration awaits the account's next free
+browser allowance after the initial probes consumed it.
 
 ## Instagram video enrichment
 

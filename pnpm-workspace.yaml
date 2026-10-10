@@ -1,3 +1,6 @@
+packages:
+  - .
+  - cloud
 onlyBuiltDependencies:
   - esbuild
   - lightningcss
