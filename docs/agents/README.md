@@ -10,8 +10,10 @@ remain available separately; their commands do not query the cloud library.
 
 ## Connect
 
-Endpoint: `https://nalanda.nullyn.workers.dev/mcp`  
-Transport: Streamable HTTP  
+Endpoint: `https://nalanda.nullyn.workers.dev/mcp`
+
+Transport: Streamable HTTP
+
 Authentication: `Authorization: Bearer <Nalanda MCP token>`
 
 Use the dedicated Nalanda token supplied privately by the owner. Never use a
